@@ -8,9 +8,6 @@ import {
 } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 
-/* Palette (same as Services page)
-   ink #222831 | deep #31363F | cyan #76ABAE | cyan-3 #9CC5C8 | pale #B9D6D8 | mist #B3B8BD | text #EEEEEE | slate #5C6676 */
-
 const navLinks = [
   { label: "Home", href: "/" },
   { label: "About", href: "/about" },
@@ -102,8 +99,8 @@ function CountUp({ end, suffix = "+" }: { end: number; suffix?: string }) {
 const glass = "border border-[#76ABAE]/20 bg-[#EEEEEE]/[0.05] backdrop-blur-xl";
 
 const Tag = ({ children }: { children: ReactNode }) => (
-  <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#B9D6D8] ${glass}`}>
-    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#9CC5C8] shadow-[0_0_10px_#76ABAE]" />
+  <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#EEEEEE] ${glass}`}>
+    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#76ABAE] shadow-[0_0_10px_#76ABAE]" />
     {children}
   </span>
 );
@@ -114,10 +111,10 @@ const Btn = ({ href, children, ghost = false }: { href: string; children: ReactN
     className={`group relative inline-flex items-center gap-2 overflow-hidden rounded-full px-8 py-4 text-sm font-bold transition-all duration-300 hover:-translate-y-1 ${
       ghost
         ? `${glass} text-[#EEEEEE] hover:bg-[#EEEEEE]/10`
-        : "bg-[#76ABAE] text-[#222831] shadow-[0_10px_40px_-10px_rgba(118,171,174,.6)] hover:bg-[#9CC5C8] hover:shadow-[0_16px_50px_-8px_rgba(118,171,174,.8)]"
+        : "bg-[#76ABAE] text-[#222831] shadow-[0_10px_40px_-10px_rgba(118,171,174,.6)] hover:bg-[#EEEEEE] hover:shadow-[0_16px_50px_-8px_rgba(118,171,174,.8)]"
     }`}
   >
-    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#EEEEEE]/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
     <span className="relative">{children}</span>
     {!ghost && <ArrowRight size={16} className="relative transition-transform group-hover:translate-x-1" />}
   </Link>
@@ -147,7 +144,7 @@ export default function Home() {
   const resetTilt = () => { if (tilt.current) tilt.current.style.transform = "perspective(1000px)"; };
 
   return (
-    <main className="home-root relative overflow-x-clip bg-[linear-gradient(180deg,#31363F_0%,#222831_22%,#2a303a_50%,#222831_78%,#1D2229_100%)] text-[#EEEEEE] selection:bg-[#76ABAE] selection:text-[#222831]">
+    <main className="home-root relative overflow-x-clip bg-[linear-gradient(180deg,#31363F_0%,#222831_22%,#31363F_50%,#222831_78%,#222831_100%)] text-[#EEEEEE] selection:bg-[#76ABAE] selection:text-[#222831]">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Sans:wght@400;500;600;700&display=swap');
         .home-root{font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif}
@@ -159,7 +156,7 @@ export default function Home() {
         @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(50px,-40px)} }
         @keyframes grad { to{background-position:200% center} }
         .up{opacity:0;animation:up 1s cubic-bezier(.2,.7,.2,1) forwards}
-        .gtext{background:linear-gradient(100deg,#B9D6D8 0%,#76ABAE 30%,#EEEEEE 55%,#76ABAE 80%,#B9D6D8 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:grad 6s linear infinite}
+        .gtext{background:linear-gradient(100deg,#EEEEEE 0%,#76ABAE 30%,#EEEEEE 55%,#76ABAE 80%,#EEEEEE 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:grad 6s linear infinite}
         .outline{color:transparent;-webkit-text-stroke:1.5px rgba(118,171,174,.7)}
         .grid-bg{background-image:linear-gradient(rgba(118,171,174,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(118,171,174,.07) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 75%)}
         .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
@@ -171,7 +168,7 @@ export default function Home() {
       <section className="relative isolate flex min-h-screen items-center px-6 pb-20 pt-40">
         <div className="absolute inset-0 -z-10 grid-bg" aria-hidden />
         <div className="absolute left-[8%] top-1/3 -z-10 h-80 w-80 animate-[drift_16s_ease-in-out_infinite] rounded-full bg-[#76ABAE]/30 blur-[120px]" />
-        <div className="absolute bottom-10 right-[10%] -z-10 h-96 w-96 animate-[drift_20s_ease-in-out_infinite_reverse] rounded-full bg-[#5C6676]/30 blur-[130px]" />
+        <div className="absolute bottom-10 right-[10%] -z-10 h-96 w-96 animate-[drift_20s_ease-in-out_infinite_reverse] rounded-full bg-[#EEEEEE]/10 blur-[130px]" />
 
         <div className="mx-auto grid w-full max-w-7xl items-center gap-16 lg:grid-cols-[1.1fr_1fr]">
           <div>
@@ -181,7 +178,7 @@ export default function Home() {
               <span className="outline block">Grow.</span>
               <span className="gtext block">Dominate.</span>
             </h1>
-            <p className="up mt-8 max-w-lg text-lg leading-relaxed text-[#B3B8BD]" style={{ animationDelay: ".3s" }}>
+            <p className="up mt-8 max-w-lg text-lg leading-relaxed text-[#EEEEEE]/70" style={{ animationDelay: ".3s" }}>
               Empire AE is your end-to-end partner — from stunning websites and powerful
               mobile apps to data-driven marketing strategies that grow your business.
             </p>
@@ -199,27 +196,51 @@ export default function Home() {
                 <img src="/hero.webp" alt="Modern office with team" className="aspect-[4/5] w-full rounded-[1.5rem] object-cover sm:aspect-[4/3]" />
               </div>
               <div className={`absolute -left-6 top-10 flex animate-[float_4s_ease-in-out_infinite] items-center gap-3 rounded-2xl px-4 py-3 shadow-xl [transform:translateZ(60px)] ${glass} bg-[#222831]/70`}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#9CC5C8]"><Zap size={18} /></span>
-                <div><p className="text-sm font-bold">Fast Delivery</p><p className="text-xs text-[#B3B8BD]">1–3 weeks</p></div>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#aceef1]"><Zap size={18} /></span>
+                <div><p className="text-sm font-bold">Fast Delivery</p><p className="text-xs text-[#EEEEEE]/90">1–3 weeks</p></div>
               </div>
               <div className={`absolute -bottom-6 right-6 flex animate-[float_5s_ease-in-out_infinite_1s] items-center gap-3 rounded-2xl px-4 py-3 shadow-xl [transform:translateZ(80px)] ${glass} bg-[#222831]/70`}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#B9D6D8]"><CheckCircle2 size={18} /></span>
-                <div><p className="text-sm font-bold">9+ Years</p><p className="text-xs text-[#B3B8BD]">Of experience</p></div>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#EEEEEE]"><CheckCircle2 size={18} /></span>
+                <div><p className="text-sm font-bold">9+ Years</p><p className="text-xs text-[#EEEEEE]/70">Of experience</p></div>
               </div>
             </div>
 
             {/* rotating badge */}
-            <svg viewBox="0 0 120 120" className="absolute -right-6 -top-10 hidden h-28 w-28 animate-[spin_18s_linear_infinite] sm:block" aria-hidden>
-              <defs><path id="c" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0" /></defs>
-              <text fontSize="10.5" fontWeight="700" letterSpacing="3.2" fill="#B9D6D8"><textPath href="#c">SCROLL • EXPLORE • DISCOVER •</textPath></text>
-              <circle cx="60" cy="60" r="6" fill="#76ABAE" />
-            </svg>
+           
+<div>
+  <svg
+    viewBox="0 0 120 120"
+    className="absolute -right-6 -top-10 hidden h-28 w-28 animate-[spin_18s_linear_infinite] sm:block"
+    aria-hidden="true"
+  >
+    <defs>
+      <path
+        id="scroll-circle"
+        d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"
+      />
+    </defs>
+
+    <text
+      fontSize="10.5"
+      fontWeight="700"
+      letterSpacing="3.2"
+      fill="#EEEEEE"
+    >
+      <textPath href="#scroll-circle" startOffset="0%">
+        SCROLL • EXPLORE • DISCOVER •
+      </textPath>
+    </text>
+
+    <circle cx="60" cy="60" r="6" fill="#76ABAE" />
+  </svg>
+</div>
+
           </div>
         </div>
       </section>
 
       {/* ───── MARQUEE ───── */}
-      <div className="overflow-hidden border-y border-[#76ABAE]/15 bg-[#1D2229] py-6 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]">
+      <div className="overflow-hidden border-y border-[#76ABAE]/15 bg-[#31363F] py-6 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]">
         <div className="flex w-max animate-[marquee_40s_linear_infinite] hover:[animation-play-state:paused]">
           {[...marqueeItems, ...marqueeItems].map((item, i) => (
             <span key={i} className="outline flex items-center whitespace-nowrap text-3xl font-extrabold uppercase tracking-tight transition-all hover:!text-[#EEEEEE]">
@@ -238,7 +259,7 @@ export default function Home() {
               <div className={`group rounded-3xl p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-[#76ABAE]/50 hover:bg-[#76ABAE]/10 ${glass}`}>
                 <p className="text-5xl font-extrabold text-[#EEEEEE] drop-shadow-[0_0_30px_rgba(118,171,174,.55)]"><CountUp end={s.value} suffix={s.suffix} /></p>
                 <div className="mx-auto mt-4 h-px w-10 bg-[#76ABAE] transition-all duration-500 group-hover:w-24" />
-                <p className="mt-4 text-xs uppercase tracking-widest text-[#B3B8BD]">{s.label}</p>
+                <p className="mt-4 text-xs uppercase tracking-widest text-[#EEEEEE]/70">{s.label}</p>
               </div>
             </Reveal>
           ))}
@@ -253,8 +274,8 @@ export default function Home() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/about.webp" alt="Our team" className="relative aspect-[4/5] w-full rounded-[2rem] border border-[#76ABAE]/25 object-cover" />
             <div className={`absolute -bottom-6 -right-2 flex animate-[float_5s_ease-in-out_infinite] items-center gap-3 rounded-2xl bg-[#222831]/80 px-5 py-4 shadow-2xl ${glass}`}>
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#9CC5C8]"><Users size={20} /></span>
-              <div><p className="text-xl font-extrabold leading-none">50+</p><p className="text-xs text-[#B3B8BD]">Happy Clients</p></div>
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#76ABAE]"><Users size={20} /></span>
+              <div><p className="text-xl font-extrabold leading-none">50+</p><p className="text-xs text-[#EEEEEE]/70">Happy Clients</p></div>
             </div>
           </div>
         </Reveal>
@@ -266,7 +287,7 @@ export default function Home() {
             <p className="mt-6 text-lg leading-relaxed text-[#EEEEEE]">
               Branding Empire AE is a full-service digital solutions company dedicated to helping businesses build, grow, and strengthen their digital presence.
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-[#B3B8BD]">
+            <p className="mt-4 text-sm leading-relaxed text-[#EEEEEE]/70">
               We specialize in website development, mobile app development, ERP solutions, digital marketing, and brand identity creation — end-to-end services under one roof. With over 9 years of industry experience, we bring deep expertise, proven strategies, and reliable solutions to every project.
             </p>
           </Reveal>
@@ -293,7 +314,7 @@ export default function Home() {
               Smart services for a <span className="gtext">smarter digital future.</span>
             </h2>
           </Reveal>
-          <Reveal delay={200}><p className="mx-auto mt-5 max-w-lg text-[#B3B8BD]">Everything you need to build, grow, and scale your digital presence — all under one roof.</p></Reveal>
+          <Reveal delay={200}><p className="mx-auto mt-5 max-w-lg text-[#EEEEEE]/70">Everything you need to build, grow, and scale your digital presence — all under one roof.</p></Reveal>
         </div>
 
         <div className="mt-14 space-y-3">
@@ -308,12 +329,12 @@ export default function Home() {
                 >
                   <div className="flex items-center gap-5">
                     <span className="text-sm font-bold tabular-nums text-[#76ABAE]">0{i + 1}</span>
-                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all duration-500 ${on ? "rotate-6 bg-[#76ABAE] text-[#222831]" : "bg-[#76ABAE]/10 text-[#9CC5C8]"}`}><Icon size={22} /></span>
+                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all duration-500 ${on ? "rotate-6 bg-[#76ABAE] text-[#222831]" : "bg-[#76ABAE]/10 text-[#76ABAE]"}`}><Icon size={22} /></span>
                     <h3 className="flex-1 text-xl font-bold text-[#EEEEEE] sm:text-2xl">{title}</h3>
-                    <span className={`grid h-10 w-10 place-items-center rounded-full border border-[#76ABAE]/30 transition-all duration-500 ${on ? "rotate-45 border-[#76ABAE] bg-[#76ABAE] text-[#222831]" : "text-[#9CC5C8]"}`}><ArrowUpRight size={18} /></span>
+                    <span className={`grid h-10 w-10 place-items-center rounded-full border border-[#76ABAE]/30 transition-all duration-500 ${on ? "rotate-45 border-[#76ABAE] bg-[#76ABAE] text-[#222831]" : "text-[#76ABAE]"}`}><ArrowUpRight size={18} /></span>
                   </div>
                   <div className={`grid transition-all duration-500 ${on ? "grid-rows-[1fr] pt-4" : "grid-rows-[0fr]"}`}>
-                    <p className="overflow-hidden pl-0 text-sm leading-relaxed text-[#B3B8BD] sm:pl-[5.5rem]">{text}</p>
+                    <p className="overflow-hidden pl-0 text-sm leading-relaxed text-[#EEEEEE]/70 sm:pl-[5.5rem]">{text}</p>
                   </div>
                 </div>
               </Reveal>
@@ -333,14 +354,14 @@ export default function Home() {
             </h2>
           </Reveal>
           <Reveal delay={200}>
-            <p className="mt-6 max-w-md text-[#B3B8BD]">
+            <p className="mt-6 max-w-md text-[#EEEEEE]/70">
               We place our clients at the center of everything we do, focusing on understanding their goals and delivering tailored solutions that create real value.
             </p>
             <div className={`mt-8 flex items-start gap-4 rounded-3xl p-6 ${glass}`}>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#9CC5C8]"><ShieldCheck size={22} /></span>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#76ABAE]"><ShieldCheck size={22} /></span>
               <div>
                 <h3 className="font-bold text-[#EEEEEE]">Dedicated Post-Launch Support</h3>
-                <p className="mt-1 text-sm text-[#B3B8BD]">We stay with you after launch, providing ongoing monitoring and optimization.</p>
+                <p className="mt-1 text-sm text-[#EEEEEE]/70">We stay with you after launch, providing ongoing monitoring and optimization.</p>
               </div>
             </div>
           </Reveal>
@@ -356,7 +377,7 @@ export default function Home() {
                   <Plus size={18} className={`shrink-0 text-[#76ABAE] transition-transform duration-300 ${open === i ? "rotate-45" : ""}`} />
                 </button>
                 <div className={`grid transition-all duration-500 ${open === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                  <p className="overflow-hidden px-6 text-sm leading-relaxed text-[#B3B8BD]"><span className="block pb-5">{f.a}</span></p>
+                  <p className="overflow-hidden px-6 text-sm leading-relaxed text-[#EEEEEE]/70"><span className="block pb-5">{f.a}</span></p>
                 </div>
               </div>
             </Reveal>
@@ -371,13 +392,13 @@ export default function Home() {
             <div className="absolute inset-[-100%] animate-[spin_9s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0_60%,#76ABAE_85%,#EEEEEE_100%)]" />
             <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#31363F] to-[#222831] px-6 py-24 text-center">
               <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-[#76ABAE]/25 blur-[100px]" />
-              <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-[#5C6676]/25 blur-[100px]" />
+              <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-[#EEEEEE]/10 blur-[100px]" />
               <div className="relative mx-auto max-w-2xl">
                 <Tag>Get Started Today</Tag>
                 <h2 className="mt-7 text-4xl font-extrabold text-[#EEEEEE] sm:text-6xl">
                   Ready to <span className="gtext">Elevate Your Digital</span> Presence?
                 </h2>
-                <p className="mx-auto mt-5 max-w-md text-[#B3B8BD]">
+                <p className="mx-auto mt-5 max-w-md text-[#EEEEEE]/70">
                   Join 50+ satisfied clients who trust Empire AE for their digital transformation journey.
                 </p>
                 <div className="mt-10 flex flex-wrap justify-center gap-4">
@@ -392,26 +413,16 @@ export default function Home() {
         </Reveal>
       </section>
 
-      {/* ───── FOOTER ───── */}
-      <footer className="border-t-4 border-[#76ABAE] bg-[#1D2229] px-6 py-8">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 text-sm text-[#B3B8BD]">
-          <p>© {new Date().getFullYear()} Empire AE. All rights reserved.</p>
-          <div className="flex gap-6">
-            {navLinks.map((l) => <Link key={l.label} href={l.href} className="transition-colors hover:text-[#EEEEEE]">{l.label}</Link>)}
-          </div>
-        </div>
-      </footer>
-
       {/* ───── Floating buttons ───── */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col items-center gap-3">
         <Link href="https://wa.me/919847980605" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp"
-          className="relative grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-[0_0_30px_-5px_#25D366] transition-all duration-300 hover:scale-110">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[#25D366]/40" />
+          className="relative grid h-14 w-14 place-items-center rounded-full bg-[#76ABAE] text-[#222831] shadow-[0_0_30px_-5px_#76ABAE] transition-all duration-300 hover:scale-110">
+          <span className="absolute inset-0 animate-ping rounded-full bg-[#76ABAE]/40" />
           <FaWhatsapp size={30} className="relative" />
         </Link>
         <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top"
           aria-hidden={!showTop} tabIndex={showTop ? 0 : -1}
-          className={`grid h-12 w-12 place-items-center rounded-full bg-[#76ABAE] text-[#222831] shadow-xl transition-all duration-300 hover:scale-110 hover:bg-[#B9D6D8] ${showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
+          className={`grid h-12 w-12 place-items-center rounded-full bg-[#EEEEEE] text-[#222831] shadow-xl transition-all duration-300 hover:scale-110 hover:bg-[#76ABAE] ${showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
           <ArrowUp size={22} />
         </button>
       </div>
