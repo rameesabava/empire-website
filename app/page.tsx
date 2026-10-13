@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef, ReactNode, MouseEvent } from "react";
@@ -413,19 +414,8 @@ export default function Home() {
         </Reveal>
       </section>
 
-      {/* ───── Floating buttons ───── */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col items-center gap-3">
-        <Link href="https://wa.me/919847980605" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp"
-          className="relative grid h-14 w-14 place-items-center rounded-full bg-[#76ABAE] text-[#222831] shadow-[0_0_30px_-5px_#76ABAE] transition-all duration-300 hover:scale-110">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[#76ABAE]/40" />
-          <FaWhatsapp size={30} className="relative" />
-        </Link>
-        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top"
-          aria-hidden={!showTop} tabIndex={showTop ? 0 : -1}
-          className={`grid h-12 w-12 place-items-center rounded-full bg-[#EEEEEE] text-[#222831] shadow-xl transition-all duration-300 hover:scale-110 hover:bg-[#76ABAE] ${showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
-          <ArrowUp size={22} />
-        </button>
-      </div>
+     
     </main>
   );
 }
+

@@ -9,8 +9,6 @@ import { FaWhatsapp } from "react-icons/fa";
 const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["400", "600", "700", "800"], variable: "--font-display" });
 const body = DM_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-body" });
 
-/* Palette
-   #222831 base   #31363F surface   #76ABAE accent   #EEEEEE light */
 
 type Category = "Web Design" | "Mobile Apps" | "Marketing" | "Branding";
 
@@ -359,16 +357,7 @@ export default function PortfolioPage() {
         </div>
       </section>
 
-      {/* Floating WhatsApp button */}
-      <Link
-        href="https://wa.me/919847980605"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Chat on WhatsApp"
-        className="fixed bottom-5 right-5 z-50 grid h-14 w-14 place-items-center rounded-full bg-[#25D366] text-white shadow-xl transition-all duration-300 hover:scale-110 hover:shadow-2xl"
-      >
-        <FaWhatsapp size={30} />
-      </Link>
+     
     </main>
   );
 }

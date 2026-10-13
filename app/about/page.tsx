@@ -966,7 +966,6 @@ export default function AboutPage() {
         </section>
       </main>
 
-      <FloatingButtons />
     </div>
   );
 }

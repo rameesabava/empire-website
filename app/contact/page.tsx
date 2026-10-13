@@ -923,7 +923,6 @@ export default function ContactPage() {
         </section>
       </main>
 
-      <FloatingButtons />
     </div>
   );
 }
