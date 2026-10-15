@@ -75,12 +75,17 @@ const GROWTH = [
   {
     when: "YEAR ONE",
     title: "Own something",
-    text: "Lead a client deliverable end to end, present it yourself, and shape how the team does it next time.",
+    text: "Take a client deliverable from start to finish, present your work, and help improve how the team works.",
   },
   {
-    when: "YEAR TWO AND BEYOND",
-    title: "Lead or specialise",
-    text: "Grow into leading a team or going deeper in your craft. Both paths are paid and valued the same.",
+    when: "YEAR TWO",
+    title: "Take the lead",
+    text: "Own larger pieces of work, support teammates, and deepen your expertise. Start building the skills to lead projects or specialise in your craft.",
+  },
+  {
+    when: "YEAR THREE AND BEYOND",
+    title: "Make your mark",
+    text: "Lead teams or major projects, mentor the next generation, or become a recognised expert in your field. Grow in the direction that suits your strengths and ambitions.",
   },
 ];
 
