@@ -1,7 +1,64 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 
+/* ------------------------------------------------------------------ */
+/* Theme variables for the logo (inlined so this file is self-contained) */
+/* Dark mode follows a `.dark` class or data-theme="dark" on <html>.   */
+/* ------------------------------------------------------------------ */
+const brandLogoCss = `
+:root{--brand-logo-background:#fff;--brand-logo-color:#0a0a0a}
+.dark,[data-theme="dark"]{--brand-logo-background:#0a0a0a;--brand-logo-color:#fff}
+.brand-surface-light{--brand-logo-background:#fff;--brand-logo-color:#0a0a0a}
+.brand-surface-dark{--brand-logo-background:#0a0a0a;--brand-logo-color:#fff}
+.brand-launcher{--brand-logo-background:#0a0a0a;--brand-logo-color:#fff;background-color:var(--brand-logo-background)}
+.dark .brand-launcher,[data-theme="dark"] .brand-launcher{--brand-logo-background:#fff;--brand-logo-color:#0a0a0a}
+`;
+
+/* ------------------------------------------------------------------ */
+/* BrandLogo: ring (270° arc, opening upper-right) + four-point sparkle */
+/* ------------------------------------------------------------------ */
+const RING = "M252 0A252 252 0 1 0 504 252L362 252A110 110 0 1 1 252 142Z";
+const SPARKLE =
+    "M362 43A99 99 0 0 0 461 142A99 99 0 0 0 362 241A99 99 0 0 0 263 142A99 99 0 0 0 362 43Z";
+
+type BrandLogoProps = {
+    size?: number | string;
+    className?: string;
+    color?: string;
+    title?: string;
+};
+
+function BrandLogo({ size = 24, className, color, title }: BrandLogoProps) {
+    const style: CSSProperties = {
+        color: color ?? "var(--brand-logo-color, currentColor)",
+        flexShrink: 0,
+        pointerEvents: "none",
+    };
+
+    return (
+        <svg
+            viewBox="0 0 504 504"
+            width={size}
+            height={size}
+            fill="currentColor"
+            className={className}
+            style={style}
+            focusable="false"
+            {...(title
+                ? { role: "img", "aria-label": title }
+                : { "aria-hidden": true })}
+        >
+            {title ? <title>{title}</title> : null}
+            <path d={RING} />
+            <path d={SPARKLE} />
+        </svg>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/* Chatbot                                                             */
+/* ------------------------------------------------------------------ */
 type Message = {
     role: "bot" | "user";
     text: string;
@@ -42,17 +99,11 @@ function getReply(message: string): string {
         return "You can reach our team through the Contact page. Tell us about your project, and we'll help you take the next step.";
     }
 
-    if (
-        text.includes("web") ||
-        text.includes("website")
-    ) {
+    if (text.includes("web") || text.includes("website")) {
         return "We build modern, responsive websites tailored to your business, with a focus on performance, accessibility, and user experience. Would you like to discuss a new website or improve an existing one?";
     }
 
-    if (
-        text.includes("mobile") ||
-        text.includes("app")
-    ) {
+    if (text.includes("mobile") || text.includes("app")) {
         return "We develop mobile applications for Android and iOS, focusing on performance, usability, and scalability.";
     }
 
@@ -64,10 +115,7 @@ function getReply(message: string): string {
         return "Our digital marketing services include SEO, social media marketing, and content marketing to help your business reach the right audience.";
     }
 
-    if (
-        text.includes("hosting") ||
-        text.includes("domain")
-    ) {
+    if (text.includes("hosting") || text.includes("domain")) {
         return "We can help with hosting and domain solutions for your website. Contact our team to discuss the right setup for your project.";
     }
 
@@ -89,55 +137,6 @@ function getReply(message: string): string {
     }
 
     return "Thanks for reaching out! I can help you explore our services, learn about project quotes, or get in touch with our team. What would you like to know?";
-}
-
-function RobotIcon({ className = "h-7 w-7" }: { className?: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-        >
-            {/* Antenna */}
-            <path d="M12 4v2" />
-            <circle cx="12" cy="2.5" r="1" />
-
-            {/* Robot head */}
-            <rect x="4" y="6" width="16" height="14" rx="4" />
-
-            {/* Robot eyes */}
-            <circle cx="9" cy="12" r="1" fill="currentColor" />
-            <circle cx="15" cy="12" r="1" fill="currentColor" />
-
-            {/* Robot mouth */}
-            <path d="M9 16h6" />
-
-            {/* Side details */}
-            <path d="M4 11H2.5v4H4" />
-            <path d="M20 11h1.5v4H20" />
-        </svg>
-    );
-}
-
-function CloseIcon() {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            className="h-5 w-5"
-            aria-hidden="true"
-        >
-            <path d="m6 6 12 12M18 6 6 18" />
-        </svg>
-    );
 }
 
 function SendIcon() {
@@ -162,6 +161,7 @@ export default function Chatbot() {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState("");
     const [isTyping, setIsTyping] = useState(false);
+
     const [messages, setMessages] = useState<Message[]>([
         {
             role: "bot",
@@ -182,8 +182,6 @@ export default function Chatbot() {
         setInput("");
         setIsTyping(true);
 
-        // Demo response using predefined rules.
-        // Connect a server-side AI API for real AI conversations.
         window.setTimeout(() => {
             const reply = getReply(message);
 
@@ -202,47 +200,53 @@ export default function Chatbot() {
     }
 
     return (
-        <div className="fixed bottom-6 right-6 z-[100] font-sans">
-            {/* Chat window */}
+        <div className="fixed bottom-8 right-8 z-[100] font-sans">
+            <style>{brandLogoCss}</style>
+
             {isOpen && (
                 <section
                     aria-label="Empire chatbot"
-                    className="mb-4 flex h-[min(560px,calc(100dvh-120px))] w-[min(380px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-[#76ABAE]/20 bg-[#222831] shadow-2xl shadow-black/40"
+                    className="mb-3 flex h-[min(660px,calc(100dvh-40px))] w-[min(420px,calc(100vw-24px))] flex-col overflow-hidden rounded-[32px] border-2 border-[#D7D7D7] bg-[#F7F7F7] shadow-[0_12px_50px_rgba(0,0,0,0.16)]"
                 >
-                    {/* Header */}
-                    <div className="flex items-center gap-3 border-b border-white/10 bg-[#31363F] p-4">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#76ABAE] text-[#222831]">
-                            <RobotIcon className="h-7 w-7" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                            <h2 className="font-bold text-[#EEEEEE]">
-                                Empire Assistant
-                            </h2>
-
-                            <p className="mt-1 flex items-center gap-2 text-xs text-[#76ABAE]">
-                                <span className="h-2 w-2 rounded-full bg-[#76ABAE]" />
-                                Here to help
-                            </p>
+                    {/* Header: logo + brand name, minimize button */}
+                    <div className="brand-surface-light flex shrink-0 items-center justify-between px-3 pt-3">
+                        <div className="flex items-center gap-2 pl-1">
+                            <BrandLogo size={30} />
+                            <span className="text-[15px] font-semibold text-[#202124]">
+                                Empire
+                            </span>
                         </div>
 
                         <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            aria-label="Close chatbot"
-                            className="rounded-lg p-2 text-[#EEEEEE] transition hover:bg-white/10 hover:text-[#76ABAE]"
+                            aria-label="Minimize chatbot"
+                            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#222222] transition hover:bg-[#EAEAEA]"
                         >
-                            <CloseIcon />
+                            <svg
+                                viewBox="0 0 24 24"
+                                className="h-5 w-5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
                         </button>
                     </div>
 
-                    {/* Messages */}
+                    {/* Chat messages */}
                     <div
-                        className="flex-1 space-y-4 overflow-y-auto p-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        className="flex-1 space-y-5 overflow-y-auto px-4 pb-4 pt-2 [scrollbar-width:thin] [scrollbar-color:#D5D5D5_transparent]"
                         aria-live="polite"
                     >
-                        <p className="text-center text-[11px] tracking-wider text-[#EEEEEE]/40">
-                            WELCOME TO EMPIRE
+                        <p className="text-right">
+                            <span className="inline-block max-w-[85%] rounded-bl-[18px] rounded-br-[6px] rounded-tl-[18px] rounded-tr-[18px] bg-white px-4 py-3 text-sm text-[#202124] shadow-sm">
+                                Welcome!
+                            </span>
                         </p>
 
                         {messages.map((message, index) => (
@@ -254,17 +258,11 @@ export default function Chatbot() {
                                         : "justify-start"
                                 }`}
                             >
-                                {message.role === "bot" && (
-                                    <div className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#31363F] text-[#76ABAE]">
-                                        <RobotIcon className="h-4 w-4" />
-                                    </div>
-                                )}
-
                                 <div
-                                    className={`max-w-[84%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm leading-6 ${
+                                    className={`max-w-[94%] whitespace-pre-wrap break-words text-[15px] leading-[1.65] ${
                                         message.role === "user"
-                                            ? "rounded-br-sm bg-[#76ABAE] text-[#222831]"
-                                            : "rounded-bl-sm border border-white/5 bg-[#31363F] text-[#EEEEEE]"
+                                            ? "rounded-2xl rounded-br-md bg-white px-4 py-3 text-[#202124] shadow-sm"
+                                            : "text-[#202124]"
                                     }`}
                                 >
                                     {message.text}
@@ -273,25 +271,23 @@ export default function Chatbot() {
                         ))}
 
                         {isTyping && (
-                            <div className="flex items-center gap-2">
-                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#31363F] text-[#76ABAE]">
-                                    <RobotIcon className="h-4 w-4" />
-                                </div>
-
-                                <div
-                                    className="rounded-xl bg-[#31363F] px-4 py-3 text-sm text-[#76ABAE]"
-                                    aria-label="Assistant is typing"
-                                >
-                                    Thinking...
-                                </div>
+                            <div
+                                className="flex items-center gap-2 text-sm text-[#666666]"
+                                aria-label="Assistant is thinking"
+                            >
+                                <span className="flex gap-1">
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#7D8798]" />
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#7D8798] [animation-delay:150ms]" />
+                                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#7D8798] [animation-delay:300ms]" />
+                                </span>
+                                Thinking...
                             </div>
                         )}
 
-                        {/* Quick questions */}
                         {messages.length === 1 && !isTyping && (
-                            <div className="space-y-2 pt-2">
-                                <p className="mb-3 text-xs font-medium tracking-wide text-[#EEEEEE]/60">
-                                    QUICK QUESTIONS
+                            <div className="space-y-2 pt-1">
+                                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-[#777777]">
+                                    Quick questions
                                 </p>
 
                                 {quickQuestions.map((question) => (
@@ -299,10 +295,10 @@ export default function Chatbot() {
                                         key={question}
                                         type="button"
                                         onClick={() => sendMessage(question)}
-                                        className="block w-full rounded-xl border border-[#76ABAE]/30 px-3 py-2.5 text-left text-xs text-[#76ABAE] transition hover:bg-[#76ABAE]/10"
+                                        className="block w-full rounded-xl border border-[#E5E5E5] bg-white px-3 py-2.5 text-left text-sm text-[#333333] transition hover:border-[#BFC7D4] hover:bg-[#F5F6F8]"
                                     >
                                         {question}
-                                        <span className="float-right ml-2">
+                                        <span className="float-right ml-2 text-[#788398]">
                                             ↗
                                         </span>
                                     </button>
@@ -314,54 +310,50 @@ export default function Chatbot() {
                     {/* Message input */}
                     <form
                         onSubmit={handleSubmit}
-                        className="border-t border-white/10 bg-[#31363F]/60 p-3"
+                        className="shrink-0 px-4 pb-1 pt-3"
                     >
-                        <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#222831] p-1.5 transition focus-within:border-[#76ABAE]/60">
+                        <div className="flex items-center gap-2 rounded-full border border-[#E2E2E2] bg-white p-1.5 pl-4 transition focus-within:border-[#B9C2D0]">
                             <input
                                 type="text"
                                 value={input}
                                 onChange={(event) =>
                                     setInput(event.target.value)
                                 }
-                                placeholder="Type your message..."
+                                placeholder="Type a message..."
                                 aria-label="Type your message"
                                 autoComplete="off"
-                                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-[#EEEEEE] outline-none placeholder:text-[#EEEEEE]/40"
+                                className="min-w-0 flex-1 bg-transparent py-2 text-sm text-[#202124] outline-none placeholder:text-[#9299A5]"
                             />
 
                             <button
                                 type="submit"
                                 disabled={!input.trim() || isTyping}
                                 aria-label="Send message"
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#76ABAE] text-[#222831] transition hover:bg-[#8ac0c2] disabled:cursor-not-allowed disabled:opacity-40"
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#929292] text-white transition hover:bg-[#737373] disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 <SendIcon />
                             </button>
                         </div>
 
-                        <p className="mt-2 text-center text-[10px] text-[#EEEEEE]/35">
-                            Empire · Your digital growth partner
+                        <p className="py-3 text-center text-[10px] text-[#9299A5]">
+                            Powered by Empire
                         </p>
                     </form>
                 </section>
             )}
 
-            {/* Floating robot button */}
-            <div className="flex justify-end">
+            {/* Floating chatbot launcher */}
+            {!isOpen && (
                 <button
                     type="button"
-                    onClick={() => setIsOpen((previous) => !previous)}
-                    aria-label={isOpen ? "Close chat" : "Open chat"}
+                    onClick={() => setIsOpen(true)}
+                    aria-label="Open chat"
                     aria-expanded={isOpen}
-                    className="group flex h-14 w-14 items-center justify-center rounded-full border border-[#EEEEEE]/20 bg-[#76ABAE] text-[#222831] shadow-lg shadow-black/30 transition duration-300 hover:scale-105 hover:bg-[#8ac0c2] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#76ABAE]"
+                    className="brand-launcher group flex h-[66px] w-[66px] items-center justify-center rounded-full shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition duration-300 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[color:var(--brand-logo-background)]"
                 >
-                    {isOpen ? (
-                        <CloseIcon />
-                    ) : (
-                        <RobotIcon className="h-7 w-7 transition-transform duration-300 group-hover:scale-110" />
-                    )}
+                    <BrandLogo size={36} />
                 </button>
-            </div>
+            )}
         </div>
     );
 }

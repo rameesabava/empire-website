@@ -5,11 +5,11 @@
  *
  * Section order:
  *   1. Video hero (4 videos, auto-advancing)
- *   2. Scroll text reveal
- *   3. Client marquee + testimonials
+ *   2. Scroll text reveal (per-character)
+ *   3. Brand showcase (black -> white) + Client reviews (scroll-controlled, mouse reveal)
  *   4. Words showcase (Vision / Expertise / Success, pinned, text only)
  *   5. Services (concave scroll layout)
- *   6. Projects  (pinned)  +  Contact info (slides over the projects)
+ *   6. Projects (pinned circular wheel)  +  Contact info
  *
  * Requires:  npm install gsap lenis lucide-react
  * Save as:   app/page.tsx
@@ -19,7 +19,7 @@
  * and add `lenis.on("scroll", ScrollTrigger.update)` to your existing setup.
  */
 
-import { useState, useEffect, useRef, MouseEvent, ReactNode, type CSSProperties } from "react";
+import { useState, useEffect, useRef, ReactNode, type CSSProperties, type RefObject } from "react";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, ChevronsDown, Clock, Mail, Phone, Share2, Volume2, VolumeX } from "lucide-react";
 import Lenis from "lenis";
@@ -38,7 +38,7 @@ let lenisInstance: Lenis | null = null;
    1. HERO (4 VIDEOS)
    Put your files in /public/videos/ :
      hero-1.mp4 … hero-4.mp4   (each plays once, then the next one starts)
-     hero-1.webp … hero-4.webp (poster + thumbnail in the "Next" card)
+     hero-1.jfif (poster + thumbnail in the "Next" card; one per slide is optional)
    ===================================================================== */
 type HeroSlide = {
   video: string;
@@ -52,7 +52,7 @@ type HeroSlide = {
 const HERO_SLIDES: HeroSlide[] = [
   {
     video: "/videos/hero-1.mp4",
-    poster: "/videos/hero-1.webp",
+    poster: "/videos/hero-1.jfif",
     title: "Digital Solutions That Put You Ahead",
     text: "Empire AE delivers innovative digital solutions that empower businesses to grow and succeed.",
     cta: "View all works",
@@ -60,27 +60,27 @@ const HERO_SLIDES: HeroSlide[] = [
   },
   {
     video: "/videos/hero-2.mp4",
-    poster: "/videos/hero-2.webp",
+    poster: "/videos/hero-1.jfif",
     title: "Websites Built to Convert",
     text: "Fast, responsive and beautifully designed websites that turn visitors into loyal customers.",
     cta: "Explore web design",
-    href: "/services/web-design",
+    href: "/services",
   },
   {
     video: "/videos/hero-3.mp4",
-    poster: "/videos/hero-3.webp",
+    poster: "/videos/hero-1.jfif",
     title: "Apps People Love to Use",
     text: "Powerful Android and iOS apps engineered for seamless experiences and real business growth.",
     cta: "See mobile apps",
-    href: "/services/mobile-app-development",
+    href: "/services",
   },
   {
     video: "/videos/hero-4.mp4",
-    poster: "/videos/hero-4.webp",
+    poster: "/videos/hero-1.jfif",
     title: "Growth You Can Measure",
     text: "SEO and digital marketing strategies that raise your visibility and bring customers to your door.",
     cta: "Grow with us",
-    href: "/services/digital-marketing",
+    href: "/services",
   },
 ];
 
@@ -122,7 +122,7 @@ function VideoHero() {
   };
 
   return (
-    <section className="relative isolate flex h-screen min-h-[640px] w-full items-end overflow-hidden bg-[#222831]">
+    <section className="relative isolate flex h-[100svh] min-h-[560px] w-full items-end overflow-hidden bg-[#222831]">
       {/* all 4 videos stacked, the active one fades in */}
       {HERO_SLIDES.map((s, i) => (
         <video
@@ -157,11 +157,11 @@ function VideoHero() {
       <div className="absolute inset-0 -z-10 bg-[#222831]/55" />
       <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(34,40,49,.85)_0%,rgba(34,40,49,.35)_55%,transparent_100%),linear-gradient(0deg,rgba(34,40,49,.9)_0%,transparent_40%)]" />
 
-      <div className="mx-auto w-full max-w-[1500px] px-6 pb-28 sm:px-12 lg:px-[10%] lg:pb-24">
+      <div className="mx-auto w-full max-w-[1500px] px-5 pb-32 sm:px-12 sm:pb-44 lg:px-[10%] lg:pb-36">
         {/* key remounts the text so the entrance animation replays on every slide */}
         <div key={current} className="max-w-3xl">
           <h1
-            className="hero-title up mt-6 text-5xl font-light leading-[1.12] text-[#EEEEEE] sm:text-6xl xl:text-7xl"
+            className="hero-title up mt-6 text-[clamp(2.25rem,9vw,3rem)] font-light leading-[1.12] text-[#EEEEEE] sm:text-6xl xl:text-7xl"
             style={{ animationDelay: ".1s" }}
           >
             <span className="gtext-white font-bold">{slide.title}</span>
@@ -181,7 +181,7 @@ function VideoHero() {
       </div>
 
       {/* "Next" card with thumbnail + progress bars (hidden on phones) */}
-      <div className="absolute bottom-8 right-20 hidden w-[min(450px,55vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[7%]">
+      <div className="absolute bottom-8 right-20 hidden w-[min(450px,44vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[7%] lg:w-[min(450px,34vw)]">
         <button
           type="button"
           onClick={advance}
@@ -209,6 +209,20 @@ function VideoHero() {
         </div>
       </div>
 
+      {/* progress bars for phones (the "Next" card is hidden there) */}
+      <div className="absolute bottom-[3.75rem] left-5 right-5 flex gap-2 sm:hidden">
+        {HERO_SLIDES.map((s, i) => (
+          <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-2">
+            <span className="block h-[2px] w-full overflow-hidden bg-white/30">
+              <span
+                className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
+                style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* mute toggle */}
       <button
         onClick={() => setMuted((m) => !m)}
@@ -231,22 +245,23 @@ function VideoHero() {
 }
 
 /* =====================================================================
-   2. SCROLL TEXT REVEAL
+   2. SCROLL TEXT REVEAL (per-character)
    ===================================================================== */
+
 const TEXT =
   "At Empire AE, we believe technology should feel effortless, inspire the people who use it, and help ambitious businesses grow. We are here to build digital experiences that move your business forward.";
 
-const WORDS = TEXT.split(" ");
+// Words are kept as unbreakable units so wrapping stays natural;
+// each word's letters are individual spans.
+const WORD_LIST = TEXT.split(" ");
 
 const DIM = 0x45; // #454545
 const BRIGHT = 0xff; // #ffffff
 
-const clamp = (v: number, min = 0, max = 1) => Math.min(max, Math.max(min, v));
+// How many characters make up the soft "leading edge" of the reveal.
+const EDGE = 8;
 
-const toColor = (t: number) => {
-  const c = Math.round(DIM + (BRIGHT - DIM) * t);
-  return `rgb(${c}, ${c}, ${c})`;
-};
+const clamp = (v: number, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 
 function ScrollTextReveal() {
   const sectionRef = useRef<HTMLElement>(null);
@@ -257,72 +272,69 @@ function ScrollTextReveal() {
     const paragraph = paragraphRef.current;
     if (!section || !paragraph) return;
 
-    const words = Array.from(paragraph.querySelectorAll<HTMLSpanElement>("[data-word]"));
+    // DOM order of the spans is the reading order.
+    const chars = Array.from(paragraph.querySelectorAll<HTMLSpanElement>("[data-char]"));
+    const count = chars.length;
+    if (!count) return;
+
+    // Last painted channel value per character (avoids redundant style writes).
+    const applied = new Array<number>(count).fill(-1);
+
+    const paint = (i: number, t: number) => {
+      const c = Math.round(DIM + (BRIGHT - DIM) * t);
+      if (applied[i] !== c) {
+        applied[i] = c;
+        chars[i].style.color = `rgb(${c}, ${c}, ${c})`;
+      }
+    };
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    let lines: HTMLSpanElement[][] = [];
-    let raf = 0;
+    // Reduced motion: show the whole sentence in white, no scroll animation.
+    if (reduceMotion) {
+      for (let i = 0; i < count; i++) paint(i, 1);
+      return;
+    }
 
-    // Group word spans into rendered lines by their vertical offset.
-    const measure = () => {
-      const grouped: HTMLSpanElement[][] = [];
-      let currentTop = -Infinity;
-      for (const word of words) {
-        const top = word.offsetTop;
-        if (Math.abs(top - currentTop) > 4) {
-          grouped.push([]);
-          currentTop = top;
-        }
-        grouped[grouped.length - 1].push(word);
-      }
-      lines = grouped;
-    };
+    let raf = 0;
 
     const update = () => {
       raf = 0;
-      if (!lines.length) return;
-
-      if (reduceMotion) {
-        for (const word of words) word.style.color = toColor(1);
-        return;
-      }
 
       const rect = section.getBoundingClientRect();
       const scrollable = section.offsetHeight - window.innerHeight;
       const progress = scrollable > 0 ? clamp(-rect.top / scrollable) : 1;
-      const total = progress * lines.length;
 
-      lines.forEach((line, i) => {
-        const color = toColor(clamp(total - i));
-        for (const word of line) word.style.color = color;
-      });
+      // Reveal front moves from before the first character to past the last,
+      // so char 0 starts dim at progress 0 and the last char is white at 1.
+      const front = progress * (count + EDGE);
+
+      for (let i = 0; i < count; i++) {
+        paint(i, clamp((front - i) / EDGE));
+      }
     };
 
     const schedule = () => {
       if (!raf) raf = requestAnimationFrame(update);
     };
 
-    const remeasure = () => {
-      measure();
-      schedule();
-    };
-
-    remeasure();
+    update();
 
     window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", remeasure);
+    window.addEventListener("resize", schedule);
 
-    const ro = new ResizeObserver(remeasure);
+    // Section/paragraph size can change when the font loads or text rewraps.
+    const ro = new ResizeObserver(schedule);
     ro.observe(paragraph);
+    ro.observe(section);
 
-    // Fonts loading can change wrapping.
     if (document.fonts?.ready) {
-      document.fonts.ready.then(remeasure).catch(() => {});
+      document.fonts.ready.then(schedule).catch(() => {});
     }
 
     return () => {
       window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", remeasure);
+      window.removeEventListener("resize", schedule);
       ro.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
@@ -332,12 +344,23 @@ function ScrollTextReveal() {
     <section ref={sectionRef} className="eae-reveal">
       <div className="eae-reveal-sticky">
         <p ref={paragraphRef} className="eae-reveal-text">
-          {WORDS.map((word, i) => (
-            <span key={i} data-word style={{ color: "#454545", transition: "color 80ms linear" }}>
-              {word}
-              {i < WORDS.length - 1 ? " " : ""}
-            </span>
-          ))}
+          {/* One coherent sentence for assistive tech */}
+          <span className="eae-sr-only">{TEXT}</span>
+
+          <span aria-hidden="true">
+            {WORD_LIST.map((word, w) => (
+              <span key={`w-${w}`}>
+                <span className="eae-word">
+                  {Array.from(word).map((char, c) => (
+                    <span key={`c-${w}-${c}`} data-char className="eae-char">
+                      {char}
+                    </span>
+                  ))}
+                </span>
+                {w < WORD_LIST.length - 1 ? " " : ""}
+              </span>
+            ))}
+          </span>
         </p>
       </div>
     </section>
@@ -345,20 +368,8 @@ function ScrollTextReveal() {
 }
 
 /* =====================================================================
-   3. CLIENT MARQUEE + TESTIMONIALS  (demo data – replace later)
+   3. DEMO DATA (replace with approved testimonials later)
    ===================================================================== */
-const CLIENT_NAMES: string[] = [
-  "NovaTech",
-  "Vertex AI",
-  "Lumina Health",
-  "QuantumWorks",
-  "Orbit Systems",
-  "Nexora",
-  "BluePeak Technologies",
-  "CoreVision",
-  "Zenith Labs",
-  "Aether Digital",
-];
 
 type Testimonial = {
   id: string;
@@ -413,28 +424,306 @@ const TESTIMONIALS: Testimonial[] = [
   },
 ];
 
-function ClientMarquee({ clients }: { clients: string[] }) {
+/* =====================================================================
+   3a. BRAND SHOWCASE (GSAP: six clipped slots, logos swap group by group)
+   ===================================================================== */
+
+const SHOWCASE_HEADING = "Brands using GSAP®";
+
+/* ---------------------------------------------------------------------
+   Showcase theme: a strict, BINARY switch driven by scroll position.
+   ---------------------------------------------------------------------
+   The showcase is themed only through the CSS variables --bs-bg / --bs-fg,
+   which every logo, border and decoration already reads. The section is
+   exactly one of two states, never anything in between:
+
+     default      -> DARK  (#000000 background, #FFFFFF text)
+     .is-light    -> LIGHT (#FFFFFF background, #000000 text)  = reviews section
+
+   One ScrollTrigger toggles the `is-light` class. There is no tween, no
+   gradient and no CSS transition, so no intermediate shade can ever appear.
+   EAE_CSS below reads LIGHT.bg for the reviews section too, so they match.
+   --------------------------------------------------------------------- */
+const THEME_DARK = { bg: "#000000", fg: "#FFFFFF" };
+const THEME_LIGHT = { bg: "#FFFFFF", fg: "#000000" };
+
+// The switch point. "bottom 80%" = the showcase's lower edge has risen to 80%
+// of the viewport height, i.e. the reviews section now occupies the bottom 20%
+// of the screen. Above this scroll position: black. At or below it: white.
+// Tune this one string to switch earlier or later.
+const THEME_SWITCH_AT = "bottom 80%";
+
+type Dir = "up" | "down" | "left" | "right";
+
+type Variant =
+  | "intel" | "youtube" | "netflix" | "amazon" | "ford" | "samsung"
+  | "ea" | "nike" | "aol" | "gucci" | "mcdonalds" | "microsoft";
+
+type Brand = {
+  name: string;
+  variant: Variant;
+  /** Optional: path to a real SVG in /public (e.g. "/logos/nike.svg").
+   *  When set it is drawn with a CSS mask instead of the text mark. */
+  src?: string;
+};
+
+// Add more groups here. Every group needs the same number of brands
+// (one per slot) and the loop will cycle through them in this order.
+const BRAND_GROUPS: Brand[][] = [
+  [
+    { name: "Intel", variant: "intel" },
+    { name: "YouTube", variant: "youtube" },
+    { name: "Netflix", variant: "netflix" },
+    { name: "Amazon", variant: "amazon" },
+    { name: "Ford", variant: "ford" },
+    { name: "Samsung", variant: "samsung" },
+  ],
+  [
+    { name: "EA Games", variant: "ea" },
+    { name: "Nike", variant: "nike" },
+    { name: "AOL", variant: "aol" },
+    { name: "Gucci", variant: "gucci" },
+    { name: "McDonald's", variant: "mcdonalds" },
+    { name: "Microsoft", variant: "microsoft" },
+  ],
+];
+
+// Per-slot motion.
+//   exit      = direction the old logo travels while it leaves its slot
+//   enterFrom = side the new logo comes in from
+const SLOT_MOTION: { exit: Dir; enterFrom: Dir }[] = [
+  { exit: "left", enterFrom: "up" },
+  { exit: "down", enterFrom: "right" },
+  { exit: "right", enterFrom: "down" },
+  { exit: "down", enterFrom: "left" },
+  { exit: "left", enterFrom: "down" },
+  { exit: "down", enterFrom: "right" },
+];
+
+// Timing in seconds.
+const TIMING = {
+  hold: 2.2, // how long a group stays on screen
+  stagger: 0.2, // delay between neighbouring slots
+  exitDuration: 0.32,
+  gap: 0.32, // empty moment between a logo leaving and the next arriving
+  enterDuration: 0.48,
+};
+
+// xPercent / yPercent offsets that push a logo fully out of its slot.
+const vec = (d: Dir) => {
+  switch (d) {
+    case "left": return { xPercent: -100, yPercent: 0 };
+    case "right": return { xPercent: 100, yPercent: 0 };
+    case "up": return { xPercent: 0, yPercent: -100 };
+    default: return { xPercent: 0, yPercent: 100 };
+  }
+};
+
+// Text used by the simple one-word marks.
+const MARK_TEXT: Partial<Record<Variant, string>> = {
+  intel: "intel",
+  netflix: "NETFLIX",
+  ford: "Ford",
+  samsung: "SAMSUNG",
+  nike: "NIKE",
+  aol: "Aol.",
+  gucci: "GUCCI",
+};
+
+function LogoMark({ brand }: { brand: Brand }) {
+  if (brand.src) {
+    return (
+      <span
+        role="img"
+        aria-label={brand.name}
+        className="eae-bs-mask"
+        style={{ WebkitMaskImage: `url(${brand.src})`, maskImage: `url(${brand.src})` }}
+      />
+    );
+  }
+
+  switch (brand.variant) {
+    case "youtube":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-yt">
+          You<span className="eae-mk-yt-box">Tube</span>
+        </span>
+      );
+    case "amazon":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-amz">
+          <span>amazon</span>
+          <i aria-hidden="true" />
+        </span>
+      );
+    case "ea":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-ea">
+          <span>EA</span>
+          <small>GAMES</small>
+        </span>
+      );
+    case "mcdonalds":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-mcd">
+          <svg viewBox="0 0 24 20" aria-hidden="true">
+            <path d="M3 19V8C3 -1.5 12 -1.5 12 9C12 -1.5 21 -1.5 21 8V19" />
+          </svg>
+        </span>
+      );
+    case "microsoft":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-ms">
+          <span className="eae-mk-ms-grid" aria-hidden="true">
+            <b /><b /><b /><b />
+          </span>
+          <span>Microsoft</span>
+        </span>
+      );
+    default:
+      return (
+        <span role="img" aria-label={brand.name} className={`eae-mk eae-mk-${brand.variant}`}>
+          {MARK_TEXT[brand.variant]}
+        </span>
+      );
+  }
+}
+
+function BrandShowcase({ groups }: { groups: Brand[][] }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  // itemRefs.current[group][slot] -> the logo element for that slot in that group
+  const itemRefs = useRef<(HTMLDivElement | null)[][]>([]);
+
+  const slotCount = groups[0]?.length ?? 0;
+
+  /* ---- Logo swap timeline ---------------------------------------------- */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || groups.length < 2 || slotCount === 0) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    // matchMedia cleans up everything created inside it, and lets visitors
+    // with reduced motion keep the static first group (see CSS).
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const { hold, stagger, exitDuration, gap, enterDuration } = TIMING;
+      const transition = (slotCount - 1) * stagger + exitDuration + gap + enterDuration;
+      const cycle = hold + transition;
+
+      const tl = gsap.timeline({ paused: true, repeat: -1 });
+
+      groups.forEach((_, g) => {
+        const next = (g + 1) % groups.length;
+        const start = g * cycle + hold;
+
+        for (let s = 0; s < slotCount; s++) {
+          const out = itemRefs.current[g]?.[s];
+          const incoming = itemRefs.current[next]?.[s];
+          const motion = SLOT_MOTION[s % SLOT_MOTION.length];
+          if (!out || !incoming) continue;
+
+          const tOut = start + s * stagger;
+          const tIn = tOut + exitDuration + gap;
+          const away = vec(motion.exit);
+          const from = vec(motion.enterFrom);
+
+          // Old logo slides out of its clipped slot, then fades at the very end.
+          tl.fromTo(
+            out,
+            { xPercent: 0, yPercent: 0 },
+            { ...away, duration: exitDuration, ease: "power2.in", immediateRender: false },
+            tOut
+          );
+          tl.fromTo(
+            out,
+            { autoAlpha: 1 },
+            { autoAlpha: 0, duration: exitDuration * 0.4, ease: "none", immediateRender: false },
+            tOut + exitDuration * 0.6
+          );
+
+          // New logo slides into the same slot from its own side.
+          tl.fromTo(
+            incoming,
+            { ...from },
+            { xPercent: 0, yPercent: 0, duration: enterDuration, ease: "power3.out", immediateRender: false },
+            tIn
+          );
+          tl.fromTo(
+            incoming,
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: enterDuration * 0.35, ease: "none", immediateRender: false },
+            tIn
+          );
+        }
+      });
+
+      // Only run while the section is on screen.
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top bottom",
+        end: "bottom top",
+        onToggle: (self) => (self.isActive ? tl.play() : tl.pause()),
+      });
+    });
+
+    return () => mm.revert();
+  }, [groups, slotCount]);
+
+  /* ---- Binary theme switch (black <-> white) ---------------------------
+     Active from THEME_SWITCH_AT to the end of the page => `is-light` on.
+     Because the state comes from the scroll position itself, fast scrolling,
+     jumps and scrolling back up always land on the correct theme. It only
+     toggles a class, so it cannot touch the logo timeline. Cleanup kills the
+     trigger and removes the class, so Strict Mode leaves exactly one trigger.
+     --------------------------------------------------------------------- */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const st = ScrollTrigger.create({
+      trigger: section,
+      start: THEME_SWITCH_AT,
+      end: "max",
+      toggleClass: { targets: section, className: "is-light" },
+    });
+
+    return () => {
+      st.kill();
+      section.classList.remove("is-light");
+    };
+  }, []);
+
   return (
-    <div className="eae-marquee" aria-label="Our clients">
-      <div className="eae-track">
-        <ul className="eae-group">
-          {clients.map((name) => (
-            <li key={name} className="eae-client">
-              {name}
-            </li>
-          ))}
-        </ul>
-        <ul className="eae-group" aria-hidden="true">
-          {clients.map((name) => (
-            <li key={`${name}-copy`} className="eae-client">
-              {name}
-            </li>
-          ))}
-        </ul>
+    <section ref={sectionRef} className="eae-bs" aria-label={SHOWCASE_HEADING}>
+      <div className="eae-bs-row">
+        {Array.from({ length: slotCount }, (_, s) => (
+          <div key={s} className="eae-bs-slot">
+            {groups.map((group, g) => (
+              <div
+                key={`${g}-${group[s].name}`}
+                ref={(node) => {
+                  if (!itemRefs.current[g]) itemRefs.current[g] = [];
+                  itemRefs.current[g][s] = node;
+                }}
+                className={`eae-bs-logo${g === 0 ? " is-active" : ""}`}
+              >
+                <LogoMark brand={group[s]} />
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
+
+/* =====================================================================
+   3b. CLIENT TESTIMONIALS
+   ===================================================================== */
 
 const getInitials = (name: string) =>
   name
@@ -457,55 +746,647 @@ function Chevron({ direction }: { direction: "left" | "right" }) {
       strokeLinejoin="round"
       aria-hidden="true"
     >
-      {direction === "left" ? <polyline points="15 18 9 12 15 6" /> : <polyline points="9 18 15 12 9 6" />}
+      {direction === "left" ? (
+        <polyline points="15 18 9 12 15 6" />
+      ) : (
+        <polyline points="9 18 15 12 9 6" />
+      )}
     </svg>
   );
 }
 
+/* =====================================================================
+   3c. MOUSE REVEAL (Client Reviews only)
+   =====================================================================
+   A canvas that fills the review section, BEHIND the review content. Where
+   nothing is revealed it paints nothing, so the section stays pure white.
+   Where the cursor has been it shows a slowly drifting animated layer.
+
+   1. A smoothed copy of the cursor follows the real pointer (exponential
+      ease), so the reveal trails slightly and never jumps.
+   2. Cursor speed -> "energy" (fast attack, slow release). Energy drives
+      blob size and strength: a stopped cursor settles back to clean white.
+   3. Each frame, soft radial blobs are stamped into an offscreen MASK along
+      the path travelled, stretched in the direction of motion and jittered
+      with sin() noise, so the edge is feathered and organic. The mask fades
+      every frame, which is the trail.
+   4. The animated layer is drawn, then clipped with `destination-in` + mask.
+
+   It only listens to pointer movement. It never reads wheel/touch/keys, so
+   it cannot advance reviews, and review transitions never restart it.
+   Touch: tap-to-reveal. Reduced motion: disabled (clean white surface).
+   ===================================================================== */
+
+// Colours of the revealed layer only. The section background is untouched.
+const REVEAL_COLORS = ["#bceae8", "#7fd6d1", "#f1dfdf", "#d7f1f7"];
+
+const REVEAL = {
+  scale: 0.5, // canvas resolution relative to CSS px
+  follow: 0.1, // seconds: how loosely the reveal trails the cursor
+  attack: 0.08, // seconds: energy rise time
+  release: 0.6, // seconds: energy fall time (how soon it settles once stopped)
+  trail: 0.28, // seconds: mask fade time constant (trail length)
+  fullSpeed: 700, // px/s that counts as "full energy"
+};
+
+// The animated layer: slowly drifting colour blobs and a soft moving highlight.
+function drawRevealLayer(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  t: number
+) {
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = REVEAL_COLORS[3];
+  ctx.fillRect(0, 0, w, h);
+
+  const m = Math.max(w, h);
+  const blobs = [
+    { c: REVEAL_COLORS[0], fx: 0.23, fy: 0.31, px: 0.0, py: 1.2, r: 0.55 },
+    { c: REVEAL_COLORS[1], fx: 0.17, fy: 0.27, px: 2.1, py: 0.4, r: 0.42 },
+    { c: REVEAL_COLORS[2], fx: 0.29, fy: 0.19, px: 4.2, py: 2.6, r: 0.5 },
+    { c: REVEAL_COLORS[0], fx: 0.13, fy: 0.35, px: 1.1, py: 3.3, r: 0.38 },
+    { c: REVEAL_COLORS[1], fx: 0.21, fy: 0.15, px: 5.0, py: 0.9, r: 0.3 },
+  ];
+
+  for (const b of blobs) {
+    const x = w * (0.5 + 0.45 * Math.sin(t * b.fx * 2 + b.px));
+    const y = h * (0.5 + 0.45 * Math.cos(t * b.fy * 2 + b.py));
+    const r = m * b.r;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, b.c);
+    g.addColorStop(1, `${b.c}00`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Soft highlight band drifting across the layer.
+  const bx = ((t * 0.05) % 1) * w * 1.6 - w * 0.3;
+  const band = ctx.createLinearGradient(bx, 0, bx + w * 0.35, h);
+  band.addColorStop(0, "rgba(255,255,255,0)");
+  band.addColorStop(0.5, "rgba(255,255,255,0.35)");
+  band.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = band;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function MouseReveal({ sectionRef }: { sectionRef: RefObject<HTMLElement | null> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const canvas = canvasRef.current;
+    if (!section || !canvas) return;
+
+    // Reduced motion: no effect at all, the surface simply stays clean white.
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const dctx = canvas.getContext("2d");
+      const mask = document.createElement("canvas");
+      const mctx = mask.getContext("2d");
+      if (!dctx || !mctx) return;
+
+      const S = REVEAL.scale;
+      let W = 1;
+      let H = 1;
+
+      // State (plain variables: no React updates on pointer movement).
+      const pointer = { cx: 0, cy: 0, valid: false };
+      let tap: { cx: number; cy: number } | null = null;
+      let sx = 0, sy = 0; // smoothed position, section-relative CSS px
+      let psx = 0, psy = 0; // previous smoothed position
+      let heading = 0;
+      let energy = 0;
+      let wasInside = false;
+      let time = 0;
+      let lastStamp = -999;
+      let idleCleared = true;
+      let visible = false;
+
+      const resize = () => {
+        const r = section.getBoundingClientRect();
+        W = Math.max(1, Math.round(r.width * S));
+        H = Math.max(1, Math.round(r.height * S));
+        canvas.width = mask.width = W;
+        canvas.height = mask.height = H;
+        idleCleared = false;
+        lastStamp = -999;
+      };
+
+      const stamp = (x: number, y: number, r: number, a: number, e: number) => {
+        mctx.save();
+        mctx.translate(x * S, y * S);
+        mctx.rotate(heading);
+        // Stretch along the direction of travel for a fluid, organic feel.
+        mctx.scale(1 + 0.55 * e, 1 / (1 + 0.25 * e));
+        for (let i = 0; i < 3; i++) {
+          const ang = time * (0.9 + 0.45 * i) + i * 2.1;
+          const ox = Math.cos(ang) * r * 0.26 * S;
+          const oy = Math.sin(ang * 1.3) * r * 0.26 * S;
+          const rr = r * S * (0.78 + 0.22 * Math.sin(time * 1.7 + i * 1.9));
+          const g = mctx.createRadialGradient(ox, oy, 0, ox, oy, rr);
+          g.addColorStop(0, `rgba(0,0,0,${a})`);
+          g.addColorStop(0.45, `rgba(0,0,0,${a * 0.7})`);
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          mctx.fillStyle = g;
+          mctx.beginPath();
+          mctx.arc(ox, oy, rr, 0, Math.PI * 2);
+          mctx.fill();
+        }
+        mctx.restore();
+      };
+
+      const tick = (_time: number, deltaMs: number) => {
+        if (!visible) return;
+        const dt = Math.min(deltaMs, 50) / 1000;
+        if (dt <= 0) return;
+        time += dt;
+
+        // Pointer relative to THIS section, re-read every frame so the reveal
+        // stays aligned while the page scrolls or the viewport resizes.
+        const rect = section.getBoundingClientRect();
+        const within = (cx: number, cy: number) =>
+          cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
+        const inside = pointer.valid && within(pointer.cx, pointer.cy);
+
+        if (tap) {
+          if (within(tap.cx, tap.cy)) {
+            sx = psx = tap.cx - rect.left;
+            sy = psy = tap.cy - rect.top;
+            energy = 1;
+          }
+          tap = null;
+        }
+
+        if (inside) {
+          const tx = pointer.cx - rect.left;
+          const ty = pointer.cy - rect.top;
+          if (!wasInside) {
+            sx = psx = tx; // snap on entry so there is no sweep from an old spot
+            sy = psy = ty;
+          }
+          const k = 1 - Math.exp(-dt / REVEAL.follow);
+          sx += (tx - sx) * k;
+          sy += (ty - sy) * k;
+        }
+        wasInside = inside;
+
+        const dist = Math.hypot(sx - psx, sy - psy);
+        const speed = dist / dt;
+        const target = inside ? Math.pow(clamp(speed / REVEAL.fullSpeed), 0.7) : 0;
+        const tau = target > energy ? REVEAL.attack : REVEAL.release;
+        energy += (target - energy) * (1 - Math.exp(-dt / tau));
+        if (dist > 0.5) heading = Math.atan2(sy - psy, sx - psx);
+
+        const active = energy > 0.02 || time - lastStamp < 2;
+        if (!active) {
+          if (!idleCleared) {
+            mctx.clearRect(0, 0, W, H);
+            canvas.style.opacity = "0";
+            idleCleared = true;
+          }
+          psx = sx;
+          psy = sy;
+          return;
+        }
+
+        // Fade the mask (this is the trail), then stamp along the path.
+        mctx.globalCompositeOperation = "destination-out";
+        mctx.fillStyle = `rgba(0,0,0,${1 - Math.exp(-dt / REVEAL.trail)})`;
+        mctx.fillRect(0, 0, W, H);
+        mctx.globalCompositeOperation = "source-over";
+
+        if (energy > 0.02) {
+          const R = clamp(Math.min(rect.width, rect.height) * 0.3, 110, 300);
+          const r = R * (0.35 + 0.65 * energy);
+          const a = clamp(energy * 1.8) * 0.95;
+          const steps = Math.min(24, Math.max(1, Math.ceil(dist / Math.max(4, r * 0.35))));
+          for (let i = 1; i <= steps; i++) {
+            const f = i / steps;
+            stamp(psx + (sx - psx) * f, psy + (sy - psy) * f, r, a, energy);
+          }
+          lastStamp = time;
+        }
+        psx = sx;
+        psy = sy;
+
+        // Animated layer, clipped by the mask.
+        dctx.globalCompositeOperation = "source-over";
+        drawRevealLayer(dctx, W, H, time);
+        dctx.globalCompositeOperation = "destination-in";
+        dctx.drawImage(mask, 0, 0);
+        dctx.globalCompositeOperation = "source-over";
+
+        canvas.style.opacity = "1";
+        idleCleared = false;
+      };
+
+      /* ---- Input: pointer only (never wheel / touchmove / keys) ---- */
+      const onMove = (e: PointerEvent) => {
+        if (e.pointerType === "touch") return;
+        pointer.cx = e.clientX;
+        pointer.cy = e.clientY;
+        pointer.valid = true;
+      };
+      const onDown = (e: PointerEvent) => {
+        if (e.pointerType !== "touch") return;
+        tap = { cx: e.clientX, cy: e.clientY }; // tap-to-reveal on touch
+      };
+      const onLeave = () => {
+        pointer.valid = false;
+      };
+
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerdown", onDown, { passive: true });
+      document.addEventListener("mouseleave", onLeave);
+      window.addEventListener("blur", onLeave);
+
+      const ro = new ResizeObserver(resize);
+      ro.observe(section);
+      resize();
+
+      // Only work while the section is on screen.
+      const io = new IntersectionObserver(([entry]) => {
+        visible = entry.isIntersecting;
+      });
+      io.observe(section);
+
+      gsap.ticker.add(tick);
+
+      return () => {
+        gsap.ticker.remove(tick);
+        io.disconnect();
+        ro.disconnect();
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerdown", onDown);
+        document.removeEventListener("mouseleave", onLeave);
+        window.removeEventListener("blur", onLeave);
+        canvas.style.opacity = "0";
+      };
+    });
+
+    return () => mm.revert();
+  }, [sectionRef]);
+
+  return <canvas ref={canvasRef} className="eae-rv-canvas" aria-hidden="true" />;
+}
+
+/* ---------------------------------------------------------------------
+   Tuning
+   --------------------------------------------------------------------- */
+const SLIDE_DURATION = 0.8; // seconds per horizontal transition
+const SLIDE_EASE = "power3.inOut";
+// The section counts as "active" (wheel/touch/keys control the reviews) once
+// its top is within this many px of the viewport top and it still covers it.
+const ENGAGE_TOP_PX = 48;
+// Wheel: px of accumulated delta that count as an intentional gesture, and
+// the pause (ms) between wheel events that separates one gesture from the next.
+// Trackpad momentum is one gesture, so a single swipe moves exactly one review.
+const WHEEL_THRESHOLD = 30;
+const WHEEL_GESTURE_GAP_MS = 100;
+const TOUCH_THRESHOLD = 40; // px swipe distance
+
+type Step = 1 | -1; // 1 = next (enters from the right), -1 = previous (enters from the left)
+
 function ClientTestimonials({ items }: { items: Testimonial[] }) {
-  const [index, setIndex] = useState(0);
+  const count = items.length;
+  const sectionRef = useRef<HTMLElement>(null);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  if (items.length === 0) return null;
+  // Source of truth for logic. React state is only mirrored for aria + the
+  // arrow buttons, and is set once per transition (never per wheel event).
+  const indexRef = useRef(0);
+  const busyRef = useRef(false);
+  const stepRef = useRef<((step: Step) => boolean) | null>(null);
+  const [active, setActive] = useState(0);
 
-  const current = items[index];
-  const goPrevious = () => setIndex((i) => (i - 1 + items.length) % items.length);
-  const goNext = () => setIndex((i) => (i + 1) % items.length);
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || count === 0) return;
+
+    indexRef.current = 0;
+    busyRef.current = false;
+    setActive(0);
+
+    // Scopes every tween created below; revert() on cleanup kills them all.
+    const ctx = gsap.context(() => {}, section);
+
+    /* ---- One transition. Directions are explicit (not a reversed play) ---- */
+    const step = (dir: Step): boolean => {
+      if (busyRef.current) return false;
+
+      const from = indexRef.current;
+      const to = from + dir;
+      if (to < 0 || to >= count) return false;
+
+      const outgoing = slideRefs.current[from];
+      const incoming = slideRefs.current[to];
+      if (!outgoing || !incoming) return false;
+
+      indexRef.current = to;
+      setActive(to);
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      ctx.add(() => {
+        // Reduced motion: swap instantly, still scroll-controlled.
+        if (reduceMotion) {
+          gsap.set(outgoing, { autoAlpha: 0, xPercent: 0 });
+          gsap.set(incoming, { autoAlpha: 1, xPercent: 0 });
+          return;
+        }
+
+        busyRef.current = true;
+        const D = SLIDE_DURATION;
+
+        gsap
+          .timeline({
+            onComplete: () => {
+              busyRef.current = false;
+            },
+          })
+          // Incoming: from the right (dir 1) or from the left (dir -1) to centre.
+          .fromTo(
+            incoming,
+            { xPercent: 100 * dir },
+            { xPercent: 0, duration: D, ease: SLIDE_EASE },
+            0
+          )
+          .fromTo(
+            incoming,
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: D * 0.7, ease: "none" },
+            0
+          )
+          // Outgoing: to the left (dir 1) or to the right (dir -1).
+          .fromTo(
+            outgoing,
+            { xPercent: 0 },
+            { xPercent: -100 * dir, duration: D, ease: SLIDE_EASE },
+            0
+          )
+          .fromTo(
+            outgoing,
+            { autoAlpha: 1 },
+            { autoAlpha: 0, duration: D * 0.7, ease: "none" },
+            D * 0.3
+          );
+      });
+
+      return true;
+    };
+    stepRef.current = step;
+
+    /* ---- Is the review stage currently in control of the viewport? ---- */
+    const isActive = () => {
+      const r = section.getBoundingClientRect();
+      return r.top <= ENGAGE_TOP_PX && r.bottom >= window.innerHeight - ENGAGE_TOP_PX;
+    };
+
+    // Don't hijack the wheel from an independently scrollable child.
+    const canScrollInside = (target: EventTarget | null, delta: number) => {
+      let node = target instanceof HTMLElement ? target : null;
+      while (node && node !== section) {
+        const oy = getComputedStyle(node).overflowY;
+        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight) {
+          const atTop = node.scrollTop <= 0;
+          const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
+          if (delta < 0 ? !atTop : !atBottom) return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    /* ---- Wheel / trackpad ---------------------------------------------
+       A "gesture" = a run of wheel events with gaps < WHEEL_GESTURE_GAP_MS.
+       - A gesture that STARTS while the section is not active (e.g. the
+         momentum that carried the page here) is ignored for its whole length.
+       - An active gesture moves at most one review, then its remaining
+         momentum is swallowed so it can't skip or scroll the page.
+       - A gesture that would go past the first/last review is never
+         intercepted, so the page scrolls on natively (no trap).
+       ------------------------------------------------------------------ */
+    let lastWheel = 0;
+    let wArmed = false;
+    let wConsumed = false;
+    let acc = 0;
+
+    const toPx = (e: WheelEvent, v: number) =>
+      e.deltaMode === 1 ? v * 16 : e.deltaMode === 2 ? v * window.innerHeight : v;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return; // pinch-zoom
+
+      const now = performance.now();
+      if (now - lastWheel > WHEEL_GESTURE_GAP_MS) {
+        wArmed = isActive();
+        wConsumed = false;
+        acc = 0;
+      }
+      lastWheel = now;
+      if (!wArmed) return;
+
+      const dx = toPx(e, e.deltaX);
+      const dy = toPx(e, e.deltaY);
+      const horizontal = Math.abs(dx) > Math.abs(dy);
+      const delta = horizontal ? dx : dy;
+      if (delta === 0) return;
+
+      if (!horizontal && canScrollInside(e.target, delta)) {
+        wArmed = false;
+        return;
+      }
+
+      // Transition running, or momentum after one: swallow, don't advance again.
+      if (wConsumed || busyRef.current) {
+        wConsumed = true;
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+
+      const dir: Step = delta > 0 ? 1 : -1;
+      const to = indexRef.current + dir;
+
+      if (to < 0 || to >= count) {
+        // Horizontal swipes can't leave the section vertically; swallow them
+        // (also avoids the browser's back/forward swipe). Vertical ones leave.
+        if (horizontal) {
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        wArmed = false; // native scroll takes over for this whole gesture
+        return;
+      }
+
+      if (e.cancelable) e.preventDefault();
+      acc += delta;
+      if (Math.abs(acc) >= WHEEL_THRESHOLD) {
+        wConsumed = true;
+        step(acc > 0 ? 1 : -1);
+      }
+    };
+
+    /* ---- Touch: swipe up / left = next, swipe down / right = previous ---- */
+    let tArmed = false;
+    let tConsumed = false;
+    let sx = 0;
+    let sy = 0;
+
+    const onTouchStart = (e: TouchEvent) => {
+      tArmed = e.touches.length === 1 && isActive();
+      tConsumed = false;
+      if (tArmed) {
+        sx = e.touches[0].clientX;
+        sy = e.touches[0].clientY;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!tArmed) return;
+      if (e.touches.length !== 1) {
+        tArmed = false;
+        return;
+      }
+      const t = e.touches[0];
+      const dx = sx - t.clientX;
+      const dy = sy - t.clientY;
+      const horizontal = Math.abs(dx) > Math.abs(dy);
+      const d = horizontal ? dx : dy;
+      if (d === 0) return;
+
+      if (tConsumed || busyRef.current) {
+        tConsumed = true;
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+
+      const dir: Step = d > 0 ? 1 : -1;
+      const to = indexRef.current + dir;
+      if (to < 0 || to >= count) {
+        if (horizontal) {
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        tArmed = false; // let the page scroll out of the section
+        return;
+      }
+
+      // Decided on the first move so the browser never starts a page scroll.
+      if (e.cancelable) e.preventDefault();
+      if (Math.abs(d) >= TOUCH_THRESHOLD) {
+        tConsumed = true;
+        step(dir);
+      }
+    };
+
+    /* ---- Keyboard: Left / Right arrows while the section is active ---- */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (!isActive()) return;
+      if (step(e.key === "ArrowRight" ? 1 : -1)) e.preventDefault();
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("keydown", onKeyDown);
+      stepRef.current = null;
+      ctx.revert();
+      indexRef.current = 0;
+      busyRef.current = false;
+    };
+  }, [count]);
+
+  if (count === 0) return null;
 
   return (
-    <div className="eae-container">
-      <div className="eae-header">
-        <h2 className="eae-heading">What clients say about us</h2>
-        <div className="eae-controls">
-          <button type="button" className="eae-arrow" onClick={goPrevious} aria-label="Previous testimonial">
-            <Chevron direction="left" />
-          </button>
-          <button type="button" className="eae-arrow" onClick={goNext} aria-label="Next testimonial">
-            <Chevron direction="right" />
-          </button>
+    <section
+      ref={sectionRef}
+      className="eae-showcase"
+      /* Lenis must not also scroll the page on wheel/touch inside this stage;
+         this component handles those events itself. */
+      data-lenis-prevent
+      aria-roledescription="carousel"
+      aria-label="Client reviews"
+    >
+      <MouseReveal sectionRef={sectionRef} />
+
+      <div className="eae-container">
+        <div className="eae-header">
+          <h2 className="eae-heading">What clients say about us</h2>
+          <div className="eae-controls">
+            <button
+              type="button"
+              className="eae-arrow"
+              onClick={() => stepRef.current?.(-1)}
+              disabled={active === 0}
+              aria-label="Previous testimonial"
+            >
+              <Chevron direction="left" />
+            </button>
+            <button
+              type="button"
+              className="eae-arrow"
+              onClick={() => stepRef.current?.(1)}
+              disabled={active === count - 1}
+              aria-label="Next testimonial"
+            >
+              <Chevron direction="right" />
+            </button>
+          </div>
+        </div>
+
+        {/* Stationary stage: every review shares one grid cell, so the stage is
+            as tall as the tallest review and only the content slides. */}
+        <div className="eae-viewport" aria-live="polite">
+          {items.map((item, i) => (
+            <div
+              key={item.id}
+              ref={(node) => {
+                slideRefs.current[i] = node;
+              }}
+              className={`eae-slide${i === 0 ? " eae-slide--initial" : ""}`}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${count}`}
+              aria-hidden={i !== active}
+            >
+              <div className="eae-content">
+                <div className="eae-person">
+                  <div className="eae-avatar" aria-hidden="true">
+                    {item.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.image} alt="" />
+                    ) : (
+                      getInitials(item.name)
+                    )}
+                  </div>
+                  <div>
+                    <p className="eae-name">{item.name}</p>
+                    <p className="eae-meta">{item.role}</p>
+                    <p className="eae-meta">{item.company}</p>
+                  </div>
+                </div>
+
+                <blockquote className="eae-quote">{item.review}</blockquote>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* key remounts the block so the fade replays on every change */}
-      <div key={current.id} className="eae-content" aria-live="polite">
-        <div className="eae-person">
-          <div className="eae-avatar" aria-hidden="true">
-            {current.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={current.image} alt="" />
-            ) : (
-              getInitials(current.name)
-            )}
-          </div>
-          <div>
-            <p className="eae-name">{current.name}</p>
-            <p className="eae-meta">{current.role}</p>
-            <p className="eae-meta">{current.company}</p>
-          </div>
-        </div>
-
-        <blockquote className="eae-quote">{current.review}</blockquote>
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -1078,7 +1959,7 @@ function ServicesSection({
 }
 
 /* =====================================================================
-   5. PROJECTS (pinned) + CONTACT INFO (slides over the projects)
+   5. PROJECTS (circular wheel) + CONTACT INFO
    ===================================================================== */
 type Category = "Web Design" | "Mobile Apps" | "Marketing" | "Branding";
 
@@ -1149,160 +2030,258 @@ const projects: {
   },
 ];
 
-function ProjectIndex() {
-  const [active, setActive] = useState<(typeof filters)[number]>("All Projects");
-  const [hovered, setHovered] = useState<string | null>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [scrolling, setScrolling] = useState(false);
+/* ---- Circular project wheel: pinned, scroll rotates the projects around a big ring ---- */
+function ProjectsWheel() {
+  const [filter, setFilter] = useState<(typeof filters)[number]>("All Projects");
+  const [idx, setIdx] = useState(0);
+  const rootRef = useRef<HTMLElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLSpanElement>(null);
+  const stRef = useRef<ScrollTrigger | null>(null);
 
-  /* While the page is scrolling, switch hover effects off. Rows sliding under a still cursor
-     would otherwise keep expanding/collapsing and swapping the preview image, which makes the
-     wheel feel stuck. Hover comes back ~150ms after scrolling stops. */
-  useEffect(() => {
-    let t = 0;
-    const onScroll = () => {
-      setScrolling(true);
-      setHovered(null);
-      window.clearTimeout(t);
-      t = window.setTimeout(() => setScrolling(false), 150);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.clearTimeout(t);
-    };
-  }, []);
-
-  const visible = active === "All Projects" ? projects : projects.filter((p) => p.category === active);
+  const visible = filter === "All Projects" ? projects : projects.filter((p) => p.category === filter);
   const countFor = (f: (typeof filters)[number]) =>
     f === "All Projects" ? projects.length : projects.filter((p) => p.category === f).length;
-  const hoveredProject = projects.find((p) => p.title === hovered);
+  const safeIdx = Math.min(idx, visible.length - 1);
+  const active = visible[safeIdx];
 
-  /* Floating preview follows the cursor over the project list (desktop only) */
-  const onListMove = (e: MouseEvent) => {
-    const el = previewRef.current;
-    if (!el) return;
-    const w = 360;
-    const flip = e.clientX > window.innerWidth - w - 80;
-    const x = flip ? e.clientX - w - 32 : e.clientX + 32;
-    const y = Math.max(16, Math.min(e.clientY - 120, window.innerHeight - 340));
-    el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  useEffect(() => {
+    const root = rootRef.current;
+    const ring = ringRef.current;
+    if (!root || !ring) return;
+
+    const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-pw-card]"));
+    const n = cards.length;
+    if (!n) return;
+
+    const DEG = 180 / Math.PI;
+    const proxy = { v: 0 }; // fractional index of the card at the top of the wheel
+    let R = 600; // ring radius (px)
+    let step = 0.3; // angle between neighbouring cards (rad)
+    let shown = -1;
+
+    // Sizes depend on the screen, so everything is measured, never hard-coded.
+    const measure = () => {
+      const W = root.clientWidth;
+      const H = root.clientHeight;
+      const cw = cards[0].offsetWidth || 300;
+      const cardY = Math.round(H * (W < 768 ? 0.72 : 0.7));
+      R = Math.max(W * 0.85, 520);
+      step = (cw * 1.16) / R;
+      gsap.set(cards, { top: cardY, xPercent: -50, yPercent: -50 });
+      Object.assign(ring.style, {
+        width: `${R * 2}px`,
+        height: `${R * 2}px`,
+        left: `${W / 2 - R}px`,
+        top: `${cardY}px`,
+      });
+    };
+
+    // Put every card on the circle for the current rotation.
+    const render = () => {
+      const v = proxy.v;
+      cards.forEach((el, i) => {
+        const d = i - v;
+        const ad = Math.abs(d);
+        const a = d * step;
+        gsap.set(el, {
+          x: R * Math.sin(a),
+          y: R * (1 - Math.cos(a)),
+          rotation: a * DEG,
+          scale: 1.06 - Math.min(ad, 2) * 0.15,
+          autoAlpha: ad > 3 ? 0 : Math.max(0.18, 1 - ad * 0.32),
+          zIndex: Math.round(20 - ad * 3),
+        });
+      });
+      gsap.set(ring, { rotation: -v * step * DEG });
+      if (barRef.current) barRef.current.style.transform = `scaleX(${n > 1 ? v / (n - 1) : 1})`;
+      const i = Math.round(v);
+      if (i !== shown) {
+        shown = i;
+        setIdx(i);
+      }
+    };
+
+    const ctx = gsap.context(() => {
+      measure();
+      render();
+
+      if (n > 1) {
+        const H0 = 0.2; // short hold before and after the rotation
+        const tl = gsap.timeline({
+          defaults: { ease: "none" },
+          scrollTrigger: {
+            trigger: root,
+            start: "top top",
+            end: () => `+=${Math.round(root.clientHeight * ((n - 1) * 0.7 + 0.4))}`,
+            pin: true,
+            scrub: 0.6,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+          },
+        });
+        tl.to({}, { duration: H0 });
+        tl.to(proxy, { v: n - 1, duration: n - 1, onUpdate: render });
+        tl.to({}, { duration: H0 });
+        stRef.current = tl.scrollTrigger ?? null;
+      }
+    }, root);
+
+    const ro = new ResizeObserver(() => {
+      measure();
+      render();
+    });
+    ro.observe(root);
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (cancelled) return;
+      measure();
+      render();
+      ScrollTrigger.refresh();
+    });
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      ctx.revert();
+      stRef.current = null;
+    };
+  }, [filter]);
+
+  /* Jump the wheel to card i by scrolling to its position inside the pinned range. */
+  const goTo = (i: number) => {
+    const st = stRef.current;
+    if (!st || i === safeIdx) return;
+    const n = visible.length;
+    const frac = (0.2 + i) / (n - 1 + 0.4);
+    const y = st.start + (st.end - st.start) * frac;
+    if (lenisInstance) lenisInstance.scrollTo(y, { duration: 1.1 });
+    else window.scrollTo({ top: y, behavior: "smooth" });
+  };
+
+  const pick = (f: (typeof filters)[number]) => {
+    if (f === filter) return;
+    const st = stRef.current;
+    if (st) {
+      // go back to the start of the pinned range so the new (shorter/longer) wheel starts at card 1
+      if (lenisInstance) lenisInstance.scrollTo(st.start, { immediate: true });
+      else window.scrollTo(0, st.start);
+    }
+    setIdx(0);
+    setFilter(f);
   };
 
   return (
-    <section id="projects" className="relative bg-black text-white [overflow-anchor:none]">
-      {/* ───────────── FILTERS ───────────── */}
-      <div className="sticky top-0 z-30 border-y border-white/10 bg-black/90 backdrop-blur">
-        <div className="mx-auto flex max-w-[88rem] gap-x-8 gap-y-1 overflow-x-auto px-6 sm:px-10">
+    <section id="projects" ref={rootRef} className="relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-black text-white">
+      {/* ambient glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_85%,rgba(118,171,174,.16),transparent_70%)]"
+      />
+
+      {/* the ring the cards ride on (rotates with the scroll) */}
+      <div ref={ringRef} aria-hidden="true" className="pointer-events-none absolute">
+        <div className="absolute inset-0 rounded-full border border-white/15" />
+        <div className="absolute rounded-full border border-dashed border-white/10" style={{ inset: "-6%" }} />
+        <div className="absolute rounded-full border border-white/[0.07]" style={{ inset: "9%" }} />
+        {[0, 72, 144, 216, 288].map((a) => (
+          <span key={a} className="absolute inset-0" style={{ transform: `rotate(${a}deg)` }}>
+            <i className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#9fedf1]/80" />
+          </span>
+        ))}
+      </div>
+
+      {/* project cards, placed on the ring by GSAP */}
+      {visible.map((p, i) => (
+        <div
+          key={p.title}
+          data-pw-card
+          role="button"
+          tabIndex={0}
+          aria-label={`Show ${p.title}`}
+          aria-current={i === safeIdx ? "true" : undefined}
+          onClick={() => goTo(i)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              goTo(i);
+            }
+          }}
+          className="absolute left-1/2 top-0 w-[clamp(200px,26vw,420px)] cursor-pointer outline-none"
+          style={{ opacity: 0 }}
+        >
+          <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/15 bg-[#141414] shadow-2xl shadow-black/60">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.image} alt="" draggable={false} loading="lazy" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-3 sm:p-4">
+              <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/80 sm:text-xs">{p.category}</span>
+              <span className="font-display text-lg text-white/90 sm:text-2xl">{String(i + 1).padStart(2, "0")}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* text + filters (sits above the cards, lets clicks through) */}
+      <div className="pointer-events-none relative z-30 mx-auto flex h-full max-w-[88rem] flex-col px-5 pb-6 pt-24 sm:px-10 sm:pt-28">
+        <div className="pointer-events-auto -mx-1 flex gap-x-6 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-x-8 [&::-webkit-scrollbar]:hidden">
           {filters.map((f) => (
             <button
               key={f}
-              onClick={() => setActive(f)}
-              aria-pressed={active === f}
-              className={`group relative shrink-0 py-4 text-sm font-medium transition-colors duration-300 ${
-                active === f ? "text-white" : "text-white/50 hover:text-white"
+              onClick={() => pick(f)}
+              aria-pressed={filter === f}
+              className={`group relative shrink-0 py-2 text-sm font-medium transition-colors duration-300 ${
+                filter === f ? "text-white" : "text-white/50 hover:text-white"
               }`}
             >
               {f}
-              <sup className={`ml-1 text-xs ${active === f ? "text-[#aaeff3]" : "text-white/40"}`}>{countFor(f)}</sup>
+              <sup className={`ml-1 text-xs ${filter === f ? "text-[#aaeff3]" : "text-white/40"}`}>{countFor(f)}</sup>
               <span
                 className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-[#9fedf1] transition-transform duration-500 ease-out ${
-                  active === f ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"
+                  filter === f ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"
                 }`}
               />
             </button>
           ))}
         </div>
-      </div>
 
-      {/* ───────────── PROJECT INDEX ───────────── */}
-      <div
-        className="mx-auto max-w-[88rem] px-6 pb-24 pt-4 sm:px-10"
-        onMouseMove={onListMove}
-        onMouseLeave={() => setHovered(null)}
-      >
-        <ul key={active} className={scrolling ? "pointer-events-none" : ""}>
-          {visible.map((p, i) => (
-            <li
-              key={p.title}
-              className="row-in group relative border-b border-white/10"
-              style={{ animationDelay: `${i * 70}ms` }}
-              onMouseEnter={() => setHovered(p.title)}
-              onFocus={() => setHovered(p.title)}
-              onBlur={() => setHovered(null)}
-            >
-              {/* row background wipe */}
-              <span className="absolute inset-y-0 -inset-x-6 -z-0 origin-bottom scale-y-0 rounded-2xl bg-[#141414] transition-transform duration-500 ease-out group-hover:scale-y-100 group-focus-within:scale-y-100 sm:-inset-x-10" />
-
-              <div className="relative grid items-start gap-x-8 gap-y-4 py-7 lg:grid-cols-12 lg:py-8">
-                {/* Title */}
-                <div className="lg:col-span-6">
-                  <h2 className="font-display text-xl font-bold leading-tight tracking-tight transition-all duration-500 group-hover:translate-x-3 group-hover:text-[#acf0f4] group-focus-within:translate-x-3 sm:text-3xl">
-                    <Link href="/contact" className="outline-none after:absolute after:inset-0 after:content-['']">
-                      {p.title}
-                    </Link>
-                  </h2>
-                </div>
-
-                {/* Meta */}
-                <div className="flex items-center gap-4 text-xs lg:col-span-3 lg:pt-1">
-                  <span className="rounded-full border border-[#76ABAE]/40 px-3 py-1 font-medium text-[#76ABAE]">{p.tag}</span>
-                  <span className="text-white/45">{p.year}</span>
-                </div>
-
-                {/* Arrow */}
-                <div className="hidden justify-end lg:col-span-3 lg:flex">
-                  <span className="grid h-11 w-11 place-items-center rounded-full border border-white/20 text-white transition-all duration-500 group-hover:rotate-45 group-hover:border-[#76ABAE] group-hover:bg-[#76ABAE] group-hover:text-[#222831] group-focus-within:rotate-45 group-focus-within:bg-[#76ABAE] group-focus-within:text-[#222831]">
-                    <ArrowUpRight size={20} />
-                  </span>
-                </div>
-
-                {/* Description: always visible on mobile, expands on hover on desktop */}
-                <div className="grid grid-rows-[1fr] transition-[grid-template-rows] duration-500 ease-out lg:col-span-6 lg:grid-rows-[0fr] lg:group-hover:grid-rows-[1fr] lg:group-focus-within:grid-rows-[1fr]">
-                  <div data-desc className="overflow-hidden">
-                    <p className="max-w-xl text-sm leading-relaxed text-white/65">{p.text}</p>
-                  </div>
-                </div>
-
-                {/* Mobile image (desktop uses the cursor preview) */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={p.image}
-                  alt={p.title}
-                  loading="lazy"
-                  className="aspect-[16/10] w-full rounded-xl object-cover lg:hidden"
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Cursor-following preview (desktop) */}
-      <div
-        ref={previewRef}
-        aria-hidden
-        className={`pointer-events-none fixed left-0 top-0 z-40 hidden w-[360px] transition-[opacity,scale] duration-300 lg:block ${
-          hovered ? "scale-100 opacity-100" : "scale-90 opacity-0"
-        }`}
-        style={{ transform: "translate3d(-999px,-999px,0)" }}
-      >
-        <div className="overflow-hidden rounded-2xl border border-white/15 bg-[#141414] shadow-2xl shadow-black/40">
-          <div className="relative aspect-[16/10]">
-            {projects.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={p.title}
-                src={p.image}
-                alt=""
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
-                  hovered === p.title ? "opacity-100" : "opacity-0"
-                }`}
-              />
-            ))}
+        {/* key remounts the block so the entrance animation replays for each project */}
+        <div key={active.title} aria-live="polite" className="mt-6 max-w-2xl sm:mt-8">
+          <div className="up flex items-center gap-3 text-xs" style={{ animationDelay: ".05s" }}>
+            <span className="rounded-full border border-[#76ABAE]/40 px-3 py-1 font-medium text-[#76ABAE]">{active.tag}</span>
+            <span className="text-white/45">{active.year}</span>
           </div>
-          <p className="p-4 text-xs leading-relaxed text-white/75">{hoveredProject?.overlay}</p>
+          <h2
+            className="up mt-3 font-display text-[clamp(2rem,6vw,5rem)] font-bold leading-[1.02] tracking-tight"
+            style={{ animationDelay: ".12s" }}
+          >
+            {active.title}
+          </h2>
+          <p className="up mt-4 max-w-xl text-sm leading-relaxed text-white/65 sm:text-base" style={{ animationDelay: ".2s" }}>
+            {active.text}
+          </p>
+          <Link
+            href="/contact"
+            className="pointer-events-auto up group mt-5 inline-flex items-center gap-2 text-sm font-medium text-white transition-colors hover:text-[#9fedf1] sm:text-base"
+            style={{ animationDelay: ".3s" }}
+          >
+            Start a similar project
+            <ArrowUpRight size={18} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
         </div>
+      </div>
+
+      {/* counter + progress */}
+      <div className="absolute inset-x-5 bottom-5 z-30 flex items-center gap-4 sm:inset-x-10">
+        <span className="font-display text-sm tabular-nums text-white">
+          {String(safeIdx + 1).padStart(2, "0")}
+          <span className="text-white/40"> / {String(visible.length).padStart(2, "0")}</span>
+        </span>
+        <span className="relative h-px flex-1 bg-white/15">
+          <span ref={barRef} className="absolute inset-0 origin-left bg-[#dff3f4]" style={{ transform: "scaleX(0)" }} />
+        </span>
+        {visible.length > 1 && <span className="hidden text-xs uppercase tracking-[0.18em] text-white/45 sm:block">Scroll to rotate</span>}
       </div>
     </section>
   );
@@ -1358,14 +2337,14 @@ const contactItems = [
 ];
 
 const FACEBOOK_URL = "https://www.facebook.com/empireaeitservices";
-const INSTAGRAM_URL = "https://instagram.com/empire_ae_official?vrfl=eGo4Y2Fkb3c2anpo";
+const INSTAGRAM_URL = "https://www.instagram.com/empire_ae_official/";
 const LINKEDIN_URL = "https://www.linkedin.com/company/empireaeitservices";
 
 const socialLink =
-  "flex-1 whitespace-nowrap rounded-full border border-black/20 px-2 py-1.5 text-center text-xs font-semibold text-black transition-all duration-300 hover:-translate-y-0.5 hover:border-black hover:bg-black hover:text-white sm:flex-none sm:px-3.5 sm:text-[13px]";
+  "inline-flex items-center justify-center whitespace-nowrap rounded-full border border-black/20 px-3.5 py-1.5 text-[13px] font-semibold text-black transition-all duration-300 hover:-translate-y-0.5 hover:border-black hover:bg-black hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black";
 
 const infoCard =
-  "group/info flex h-full items-center gap-4 rounded-2xl border border-black/10 bg-neutral-50 p-5 transition-all duration-300 hover:translate-x-1 hover:border-black hover:shadow-[0_18px_40px_-16px_rgba(0,0,0,.25)]";
+  "group/info flex h-full min-w-0 items-center gap-4 rounded-2xl border border-black/10 bg-neutral-50 p-5 transition-all duration-300 hover:translate-x-1 hover:border-black hover:shadow-[0_18px_40px_-16px_rgba(0,0,0,.25)]";
 const infoIcon =
   "grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-black text-white transition-transform duration-300 group-hover/info:-rotate-6";
 const infoLabel = "text-xs font-semibold uppercase tracking-[0.1em] text-black/50";
@@ -1373,7 +2352,7 @@ const infoLabel = "text-xs font-semibold uppercase tracking-[0.1em] text-black/5
 function ContactInfo() {
   return (
     <section
-      id="contact-info"
+      id="contact-info" data-nav-theme="light"
       className="relative z-10 -mt-px rounded-t-[2rem] bg-white text-black shadow-[0_-40px_80px_-20px_rgba(0,0,0,.6)] sm:rounded-t-[3rem]"
     >
       <div className="mx-auto grid max-w-[88rem] items-start gap-12 px-6 py-24 sm:px-10 lg:grid-cols-[.7fr_1.3fr] lg:gap-16 lg:py-32">
@@ -1391,7 +2370,7 @@ function ContactInfo() {
           </Reveal>
         </div>
 
-        <div className="grid auto-rows-fr gap-4 xl:grid-cols-2">
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           {contactItems.map(({ icon: Icon, label, value, href }, i) => (
             <Reveal key={label} delay={200 + i * 80} className="h-full">
               <div className={infoCard}>
@@ -1419,14 +2398,14 @@ function ContactInfo() {
               </span>
               <div className="min-w-0 flex-1">
                 <h3 className={infoLabel}>Follow Us</h3>
-                <div className="mt-2 flex flex-nowrap gap-2">
-                  <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" className={socialLink}>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on Facebook" className={socialLink}>
                     Facebook
                   </a>
-                  <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className={socialLink}>
+                  <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on Instagram" className={socialLink}>
                     Instagram
                   </a>
-                  <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" className={socialLink}>
+                  <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on LinkedIn" className={socialLink}>
                     LinkedIn
                   </a>
                 </div>
@@ -1436,46 +2415,6 @@ function ContactInfo() {
         </div>
       </div>
     </section>
-  );
-}
-
-/* ───────── projects stay pinned while the contact section slides over them ───────── */
-function StackedProjects() {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let last = NaN;
-    const calc = () => {
-      // Height of the list with every row collapsed, so hover animations never move the pin point.
-      let extra = 0;
-      if (window.matchMedia("(min-width: 1024px)").matches) {
-        el.querySelectorAll<HTMLElement>("[data-desc]").forEach((d) => {
-          extra += d.offsetHeight;
-        });
-      }
-      // pin when the BOTTOM of the projects reaches the bottom of the screen (works for tall lists too)
-      const top = Math.min(0, Math.round(window.innerHeight - (el.offsetHeight - extra)));
-      if (top !== last) {
-        last = top;
-        el.style.top = `${top}px`;
-      }
-    };
-    calc();
-    const ro = new ResizeObserver(calc);
-    ro.observe(el);
-    window.addEventListener("resize", calc);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", calc);
-    };
-  }, []);
-
-  return (
-    <div ref={ref} className="sticky z-0">
-      <ProjectIndex />
-    </div>
   );
 }
 
@@ -1618,11 +2557,11 @@ function WordsShowcase() {
 
 /* Global / hero styles */
 const HOME_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=DM+Sans:wght@400;500;600;700&display=swap');
-.home-root{font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif}
-.home-root h1,.home-root h2,.home-root h3{font-family:'Bricolage Grotesque','DM Sans',ui-sans-serif,system-ui,sans-serif;letter-spacing:-0.035em}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+.home-root{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.home-root h1,.home-root h2,.home-root h3{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;letter-spacing:-0.03em}
 .home-root h1.hero-title{font-weight:300;letter-spacing:-0.02em}
-.home-root .font-display{font-family:'Bricolage Grotesque','DM Sans',ui-sans-serif,system-ui,sans-serif}
+.home-root .font-display{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
 .home-root h2.font-display{letter-spacing:-0.025em}
 @keyframes up { from{opacity:0;transform:translateY(40px);filter:blur(8px)} to{opacity:1;transform:none;filter:blur(0)} }
 @keyframes rowIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
@@ -1635,7 +2574,7 @@ const HOME_CSS = `
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.up{opacity:1;filter:none}}
 `;
 
-/* Scroll text reveal + marquee + testimonials (scoped with "eae-") */
+/* Scroll text reveal + brand showcase + testimonials (scoped with "eae-") */
 const EAE_CSS = `
 /* Scroll text reveal */
 .eae-reveal {
@@ -1650,82 +2589,231 @@ const EAE_CSS = `
   height: 100svh;
   display: flex;
   align-items: center;
+  justify-content: center;
   background: #000000;
   overflow: hidden;
-  padding-left: clamp(20px, 22vw, 440px);
-  padding-right: clamp(20px, 5vw, 80px);
+  padding: 0 clamp(20px, 6vw, 96px);
   box-sizing: border-box;
 }
 .eae-reveal-text {
   margin: 0;
-  max-width: 1000px;
   width: 100%;
-  text-align: justify;
-  text-align-last: left;
-  text-justify: inter-word;
-  hyphens: none;
-  word-break: normal;
-  overflow-wrap: break-word;
+  max-width: 1000px;
+  text-align: left;
   font-family: inherit;
   font-weight: 300;
-  font-size: clamp(26px, 3.9vw, 57px);
-  line-height: 1.3;
-  letter-spacing: -0.01em;
+  font-size: clamp(28px, 2.8vw, 44px);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+/* Keeps each word intact so lines break between words only */
+.eae-word { display: inline-block; white-space: nowrap; }
+.eae-char { color: #454545; }
+.eae-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 @media (max-width: 1024px) {
-  .eae-reveal-sticky { padding-left: clamp(24px, 10vw, 120px); }
+  .eae-reveal-text { font-size: clamp(24px, 3.6vw, 34px); }
 }
 @media (max-width: 640px) {
-  .eae-reveal { height: 260vh; }
-  .eae-reveal-sticky { padding-left: 20px; padding-right: 20px; }
-  /* Justified text leaves wide gaps on narrow screens */
+  .eae-reveal { height: 240vh; }
   .eae-reveal-text {
-    text-align: left;
-    font-size: clamp(26px, 7vw, 32px);
-    line-height: 1.32;
+    font-size: clamp(22px, 5.8vw, 28px);
+    line-height: 1.22;
   }
 }
-.eae-showcase {
-  background: #000000;
-  color: #ffffff;
-  padding: clamp(120px, 16vw, 260px) 0 clamp(56px, 8vw, 120px);
-  overflow-x: clip;
-  font-family: inherit;
+@media (prefers-reduced-motion: reduce) {
+  .eae-reveal { height: auto; }
+  .eae-reveal-sticky {
+    position: relative;
+    height: auto;
+    min-height: 100svh;
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
 }
 
-/* Marquee */
-.eae-marquee { width: 100%; overflow: hidden; background: #000000; }
-.eae-track {
+/* Testimonials section background: shares LIGHT.bg with the showcase theme */
+.eae-showcase {
+  background: ${THEME_LIGHT.bg};
+  position: relative;
+  isolation: isolate;
+  color: #d7f1f7;
+  padding: clamp(80px, 10vw, 160px) 0 clamp(56px, 8vw, 120px);
+  overflow-x: clip;
+  font-family: inherit;
+  /* Full-height stage so the section can align with the viewport while the
+     reviews are scroll-controlled */
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  width: max-content;
-  animation: eae-marquee-ltr 45s linear infinite;
-  will-change: transform;
+  flex-direction: column;
+  justify-content: center;
 }
-.eae-marquee:hover .eae-track { animation-play-state: paused; }
-.eae-group {
-  display: flex;
-  flex-shrink: 0;
+
+/* Brand showcase: six clipped slots, logos swap with a staggered slide.
+   --bs-bg / --bs-fg default to the black theme so the very first paint is
+   correct. The scroll trigger toggles .is-light (binary, never animated). */
+.eae-bs {
+  --bs-bg: ${THEME_DARK.bg};
+  --bs-fg: ${THEME_DARK.fg};
+  --bs-fs: clamp(18px, 2.3vw, 40px); /* base logo size, everything scales from it */
+  --bs-h: clamp(56px, 5.6vw, 96px);  /* slot height */
+  background: var(--bs-bg);
+  color: var(--bs-fg);
+  padding: clamp(28px, 3vw, 48px) clamp(16px, 2vw, 32px) clamp(48px, 6vw, 96px);
+  font-family: inherit;
+  overflow: hidden;
+}
+/* Binary light state: toggled by the scroll trigger, never animated */
+.eae-bs.is-light {
+  --bs-bg: ${THEME_LIGHT.bg};
+  --bs-fg: ${THEME_LIGHT.fg};
+}
+.eae-bs-heading {
+  display: inline-flex;
   align-items: center;
-  gap: clamp(32px, 4vw, 64px);
-  padding: 0 clamp(32px, 4vw, 64px) 0 0;
-  margin: 0;
-  list-style: none;
+  gap: 10px;
+  margin: 0 0 clamp(36px, 6vw, 96px);
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: var(--bs-fg);
 }
-.eae-client {
-  font-size: clamp(16px, 1.6vw, 22px);
-  font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: 0;
-  color: #f5f5f5;
+.eae-bs-brace {
+  font-size: 2.6em;
+  font-weight: 200;
+  line-height: 0.7;
+  transform: scaleX(0.7);
+}
+.eae-bs-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 32px);
+}
+.eae-bs-slot {
+  position: relative;
+  height: var(--bs-h);
+  overflow: hidden; /* each logo is clipped to its own slot */
+}
+.eae-bs-logo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  visibility: hidden; /* GSAP reveals each logo with autoAlpha */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.eae-bs-logo.is-active { visibility: visible; opacity: 1; }
+
+/* Text-based logo marks. Swap in real SVGs through the "src" field in BRAND_GROUPS. */
+.eae-mk {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--bs-fs);
+  line-height: 1;
   white-space: nowrap;
+  color: var(--bs-fg);
 }
-@keyframes eae-marquee-ltr {
-  from { transform: translateX(-50%); }
-  to   { transform: translateX(0); }
+.eae-bs-mask {
+  display: block;
+  width: calc(var(--bs-fs) * 4);
+  height: calc(var(--bs-fs) * 1.2);
+  background: var(--bs-fg);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: left center; mask-position: left center;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+.eae-mk-intel { font-weight: 700; letter-spacing: -0.05em; font-size: calc(var(--bs-fs) * 1.1); }
+.eae-mk-youtube, .eae-mk-yt { font-weight: 700; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 0.85); }
+.eae-mk-yt-box {
+  margin-left: 0.12em;
+  padding: 0.1em 0.22em;
+  border-radius: 0.28em;
+  background: var(--bs-fg);
+  color: var(--bs-bg);
+}
+.eae-mk-netflix { font-weight: 800; letter-spacing: 0.02em; font-size: calc(var(--bs-fs) * 0.8); }
+.eae-mk-amz { flex-direction: column; align-items: flex-start; gap: 0; font-weight: 700; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 1); }
+.eae-mk-amz i {
+  display: block;
+  width: 70%;
+  height: 0.3em;
+  margin: -0.08em 0 0 0.35em;
+  border-bottom: 0.09em solid var(--bs-fg);
+  border-radius: 0 0 60% 60%;
+}
+.eae-mk-ford {
+  padding: 0.1em 0.7em 0.16em;
+  border: 0.07em solid var(--bs-fg);
+  border-radius: 50%;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: calc(var(--bs-fs) * 0.8);
+}
+.eae-mk-samsung {
+  padding: 0.35em 1em;
+  border-radius: 50%;
+  background: var(--bs-fg);
+  color: var(--bs-bg);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-size: calc(var(--bs-fs) * 0.5);
+}
+.eae-mk-ea { flex-direction: column; align-items: flex-start; font-style: italic; font-weight: 800; font-size: calc(var(--bs-fs) * 0.95); }
+.eae-mk-ea small { font-size: 0.34em; font-style: normal; font-weight: 600; letter-spacing: 0.08em; margin-top: 0.15em; }
+.eae-mk-nike { font-style: italic; font-weight: 900; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 0.9); }
+.eae-mk-aol { font-weight: 800; letter-spacing: -0.02em; font-size: calc(var(--bs-fs) * 1); }
+.eae-mk-gucci { font-family: Georgia, "Times New Roman", serif; font-weight: 300; letter-spacing: 0.03em; font-size: calc(var(--bs-fs) * 0.95); }
+.eae-mk-mcd svg {
+  width: calc(var(--bs-fs) * 0.95);
+  height: calc(var(--bs-fs) * 0.8);
+  fill: none;
+  stroke: var(--bs-fg);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.eae-mk-ms { gap: 0.25em; font-weight: 500; font-size: calc(var(--bs-fs) * 0.72); }
+.eae-mk-ms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.09em;
+  width: 1.15em;
+  height: 1.15em;
+}
+.eae-mk-ms-grid b { display: block; background: var(--bs-fg); }
+
+/* Tablet and phone: same six slots, laid out as 3 x 2 so nothing overflows */
+@media (max-width: 900px) {
+  .eae-bs { --bs-fs: clamp(20px, 5.2vw, 34px); --bs-h: clamp(56px, 12vw, 84px); }
+  .eae-bs-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: clamp(8px, 3vw, 24px); }
+}
+
+/* Reduced motion: the first group stays put, nothing animates */
+@media (prefers-reduced-motion: reduce) {
+  .eae-bs-logo { transition: none; }
 }
 
 /* Testimonials */
 .eae-container {
+  position: relative;
+  z-index: 1; /* review content stays above the reveal layer */
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
@@ -1745,7 +2833,7 @@ const EAE_CSS = `
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.02em;
-  color: #ffffff;
+  color: #000000;
 }
 .eae-controls { display: flex; gap: 12px; flex-shrink: 0; }
 .eae-arrow {
@@ -1756,7 +2844,7 @@ const EAE_CSS = `
   height: 48px;
   border: 0;
   border-radius: 50%;
-  background: #292929;
+  background: #000000;
   color: #ffffff;
   cursor: pointer;
   transition: background-color 180ms ease, transform 180ms ease;
@@ -1770,7 +2858,6 @@ const EAE_CSS = `
   gap: clamp(32px, 6vw, 96px);
   align-items: start;
   min-height: 280px;
-  animation: eae-fade-slide 380ms ease both;
 }
 .eae-person { display: flex; align-items: center; gap: 20px; }
 .eae-avatar {
@@ -1778,7 +2865,7 @@ const EAE_CSS = `
   height: 76px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #292929;
+  background: #000000;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1788,21 +2875,44 @@ const EAE_CSS = `
   overflow: hidden;
 }
 .eae-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.eae-name { margin: 0; font-size: 20px; font-weight: 600; color: #ffffff; }
-.eae-meta { margin: 4px 0 0; font-size: 16px; line-height: 1.4; color: #a3a3a3; }
+.eae-name { margin: 0; font-size: 20px; font-weight: 600; color: #444141; }
+.eae-meta { margin: 4px 0 0; font-size: 16px; line-height: 1.4; color: #4b4545; }
 .eae-quote {
   margin: 0;
   max-width: 680px;
   font-size: clamp(20px, 2.5vw, 34px);
   font-weight: 400;
   line-height: 1.4;
-  color: #ffffff;
+  color: #292626;
   text-align: left;
 }
-@keyframes eae-fade-slide {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Mouse-reveal layer: behind the review content, transparent until revealed */
+.eae-rv-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
 }
+
+/* Review stage: stationary, clipped, all slides share one grid cell */
+.eae-viewport {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+}
+.eae-slide {
+  grid-area: 1 / 1;
+  min-width: 0;
+  visibility: hidden; /* GSAP reveals slides with autoAlpha */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.eae-slide--initial { visibility: visible; opacity: 1; } /* first review: visible on first paint */
+.eae-arrow:disabled { opacity: 0.35; cursor: default; }
+.eae-arrow:disabled:hover { background: #000000; transform: none; }
 
 /* Responsive */
 @media (max-width: 900px) {
@@ -1817,9 +2927,6 @@ const EAE_CSS = `
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .eae-track { animation: none; transform: none; }
-  .eae-marquee { overflow-x: auto; }
-  .eae-content { animation: none; }
   .eae-arrow { transition: none; }
 }
 `;
@@ -1835,7 +2942,7 @@ const FW_CSS = `
 
 /* Words showcase (Vision / Expertise / Success) – scoped with "sw-" */
 const SW_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 
 .sw-section {
   position: relative;
@@ -1844,7 +2951,7 @@ const SW_CSS = `
   overflow: hidden;
   background: #000;
   color: #fff;
-  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, 'Helvetica Neue', Arial, sans-serif;
 }
 .sw-slide {
   position: absolute;
@@ -1857,7 +2964,7 @@ const SW_CSS = `
 /* big word */
 .sw-title {
   padding-left: var(--tl);
-  font-size: clamp(64px, 14.5vw, 250px);
+  font-size: clamp(48px, min(14.5vw, 30svh), 250px);
   font-weight: 200;
   line-height: 1.05;
   letter-spacing: -0.04em;
@@ -1866,7 +2973,7 @@ const SW_CSS = `
 .sw-ch { display: inline-block; will-change: transform, filter, opacity; }
 
 /* sub text */
-.sw-sub { padding-left: var(--sl); margin-top: clamp(16px, 3vh, 44px); }
+.sw-sub { padding-left: var(--sl); padding-right: clamp(20px, 5vw, 80px); margin-top: clamp(16px, 3vh, 44px); }
 .sw-line {
   margin: 0;
   font-size: clamp(14px, 1.5vw, 22px);
@@ -1877,9 +2984,11 @@ const SW_CSS = `
 }
 
 @media (max-width: 640px) {
-  .sw-title { padding-left: 6vw; font-size: clamp(56px, 22vw, 120px); }
+  .sw-title { padding-left: 6vw; font-size: clamp(44px, min(22vw, 26svh), 120px); }
   .sw-sub { padding-left: 8vw; padding-right: 6vw; }
 }
+
+@media (max-height: 500px) { .sw-line { line-height: 1.5; } }
 
 /* reduced motion: no pinning, show every word stacked */
 @media (prefers-reduced-motion: reduce) {
@@ -1924,11 +3033,9 @@ export default function Home() {
       {/* 2. SCROLL TEXT REVEAL */}
       <ScrollTextReveal />
 
-      {/* 3. CLIENT NAMES + REVIEWS */}
-      <section className="eae-showcase">
-        <ClientMarquee clients={CLIENT_NAMES} />
-        <ClientTestimonials items={TESTIMONIALS} />
-      </section>
+      {/* 3. BRAND SHOWCASE (black -> white) + CLIENT REVIEWS */}
+      <BrandShowcase groups={BRAND_GROUPS} />
+      <ClientTestimonials items={TESTIMONIALS} />
 
       {/* 4. WORDS SHOWCASE (Vision / Expertise / Success) */}
       <WordsShowcase />
@@ -1936,9 +3043,9 @@ export default function Home() {
       {/* 5. SERVICES */}
       <ServicesSection />
 
-      {/* 6. PROJECTS + CONTACT INFO (contact slides over projects) */}
-      <div className="relative">
-        <StackedProjects />
+      {/* 6. PROJECTS (circular wheel, pinned) + CONTACT INFO */}
+      <div className="relative bg-black">
+        <ProjectsWheel />
         <ContactInfo />
       </div>
     </main>
