@@ -181,33 +181,33 @@ function VideoHero() {
       </div>
 
       {/* "Next" card with thumbnail + progress bars (hidden on phones) */}
-      <div className="absolute bottom-8 right-20 hidden w-[min(450px,44vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[7%] lg:w-[min(450px,34vw)]">
-        <button
-          type="button"
-          onClick={advance}
-          aria-label={`Next: ${next.title}`}
-          className="w-[30%] shrink-0 bg-[#31363F] bg-cover bg-center"
-          style={{ backgroundImage: `url(${next.poster})` }}
-        />
-        <div className="flex min-w-0 flex-1 flex-col p-4">
-          <button type="button" onClick={advance} className="text-left text-[#EEEEEE]">
-            <span className="block text-sm">Next</span>
-            <span className="mt-0.5 block truncate text-base font-light sm:text-lg">{next.title}</span>
-          </button>
-          <div className="mt-4 flex gap-3">
-            {HERO_SLIDES.map((s, i) => (
-              <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-2">
-                <span className="block h-[2px] w-full overflow-hidden bg-white/30">
-                  <span
-                    className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
-                    style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
-                  />
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+<div className="absolute bottom-8 right-20 hidden w-[min(300px,36vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[7%] lg:w-[min(300px,24vw)]">
+  <button
+    type="button"
+    onClick={advance}
+    aria-label={`Next: ${next.title}`}
+    className="w-[26%] shrink-0 bg-[#31363F] bg-cover bg-center"
+    style={{ backgroundImage: `url(${next.poster})` }}
+  />
+  <div className="flex min-w-0 flex-1 flex-col p-3">
+    <button type="button" onClick={advance} className="text-left text-[#EEEEEE]">
+      <span className="block text-xs">Next</span>
+      <span className="mt-0.5 block truncate text-sm font-light">{next.title}</span>
+    </button>
+    <div className="mt-2 flex gap-2">
+      {HERO_SLIDES.map((s, i) => (
+        <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-1.5">
+          <span className="block h-[2px] w-full overflow-hidden bg-white/30">
+            <span
+              className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
+              style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
+            />
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
 
       {/* progress bars for phones (the "Next" card is hidden there) */}
       <div className="absolute bottom-[3.75rem] left-5 right-5 flex gap-2 sm:hidden">
