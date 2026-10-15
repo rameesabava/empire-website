@@ -7,7 +7,7 @@
  *   1. Video hero (4 videos, auto-advancing)
  *   2. Scroll text reveal (per-character)
  *   3. Brand showcase (black -> white) + Client reviews (scroll-controlled, mouse reveal)
- *   4. Words showcase (Vision / Expertise / Success, pinned, text only)
+ *   4. Words showcase (Vision / Expertise / Success, pinned, zoom-through tunnel)
  *   5. Services (concave scroll layout)
  *   6. Projects (pinned circular wheel)  +  Contact info
  *
@@ -29,6 +29,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.config({ ignoreMobileResize: true });
 }
 
 /* Shared Lenis instance so the hero "scroll down" button can use it */
@@ -116,6 +117,12 @@ function VideoHero() {
     });
   }, [current]);
 
+  useEffect(() => {
+    videos.current.forEach((v) => {
+      if (v) v.muted = muted;
+    });
+  }, [muted]);
+
   const scrollDown = () => {
     if (lenisInstance) lenisInstance.scrollTo(window.innerHeight, { duration: 1.2 });
     else window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
@@ -181,33 +188,33 @@ function VideoHero() {
       </div>
 
       {/* "Next" card with thumbnail + progress bars (hidden on phones) */}
-<div className="absolute bottom-8 right-20 hidden w-[min(300px,36vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[7%] lg:w-[min(300px,24vw)]">
-  <button
-    type="button"
-    onClick={advance}
-    aria-label={`Next: ${next.title}`}
-    className="w-[26%] shrink-0 bg-[#31363F] bg-cover bg-center"
-    style={{ backgroundImage: `url(${next.poster})` }}
-  />
-  <div className="flex min-w-0 flex-1 flex-col p-3">
-    <button type="button" onClick={advance} className="text-left text-[#EEEEEE]">
-      <span className="block text-xs">Next</span>
-      <span className="mt-0.5 block truncate text-sm font-light">{next.title}</span>
-    </button>
-    <div className="mt-2 flex gap-2">
-      {HERO_SLIDES.map((s, i) => (
-        <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-1.5">
-          <span className="block h-[2px] w-full overflow-hidden bg-white/30">
-            <span
-              className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
-              style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
-            />
-          </span>
-        </button>
-      ))}
-    </div>
-  </div>
-</div>
+      <div className="absolute bottom-8 right-20 hidden w-[min(300px,36vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[8%] lg:w-[min(300px,24vw)]">
+        <button
+          type="button"
+          onClick={advance}
+          aria-label={`Next: ${next.title}`}
+          className="w-[26%] shrink-0 bg-[#31363F] bg-cover bg-center"
+          style={{ backgroundImage: `url(${next.poster})` }}
+        />
+        <div className="flex min-w-0 flex-1 flex-col p-3">
+          <button type="button" onClick={advance} className="text-left text-[#EEEEEE]">
+            <span className="block text-xs">Next</span>
+            <span className="mt-0.5 block truncate text-sm font-light">{next.title}</span>
+          </button>
+          <div className="mt-2 flex gap-2">
+            {HERO_SLIDES.map((s, i) => (
+              <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-1.5">
+                <span className="block h-[2px] w-full overflow-hidden bg-white/30">
+                  <span
+                    className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
+                    style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
+                  />
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* progress bars for phones (the "Next" card is hidden there) */}
       <div className="absolute bottom-[3.75rem] left-5 right-5 flex gap-2 sm:hidden">
@@ -227,7 +234,7 @@ function VideoHero() {
       <button
         onClick={() => setMuted((m) => !m)}
         aria-label={muted ? "Unmute video" : "Mute video"}
-        className="absolute bottom-24 right-6 grid h-11 w-11 place-items-center text-[#EEEEEE] transition-colors hover:text-[#76ABAE] sm:bottom-8 lg:right-[3%]"
+        className="absolute bottom-24 right-6 grid h-11 w-11 place-items-center text-[#EEEEEE] transition-colors hover:text-[#76ABAE] sm:bottom-8 lg:right-[2%]"
       >
         {muted ? <VolumeX size={26} strokeWidth={1.5} /> : <Volume2 size={26} strokeWidth={1.5} />}
       </button>
@@ -1521,13 +1528,14 @@ type CurveBreakpoints = Record<"desktop" | "tablet" | "mobile", CurveConfig>;
 
 const DEFAULT_CURVE: CurveBreakpoints = {
   desktop: { tiltX: 16, tiltY: 9, depth: 170, pull: 5, inward: 4, scrub: 0.9, perspective: 1300 },
-  tablet: { tiltX: 11, tiltY: 0, depth: 110, pull: 3, inward: 0, scrub: 0.7, perspective: 1100 },
-  mobile: { tiltX: 6, tiltY: 0, depth: 45, pull: 1.5, inward: 0, scrub: 0.5, perspective: 900 },
+  tablet: { tiltX: 16, tiltY: 9, depth: 140, pull: 5, inward: 3, scrub: 0.9, perspective: 1200 },
+  // phones: same motion, depth/tilt trimmed so the leaning cards never overflow a narrow screen
+  mobile: { tiltX: 14, tiltY: 7, depth: 90, pull: 4, inward: 0, scrub: 0.8, perspective: 1000 },
 };
 
 const STEPS = 28;
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
-const WIDTH = "w-[min(100%,520px)] md:w-[min(76%,720px)] lg:w-[min(72vw,1120px)]";
+const WIDTH = "w-[min(100%,520px)] md:w-[min(94%,1120px)] lg:w-[min(72vw,1120px)]";
 
 /** side: -1 = left column, +1 = right column, 0 = single column. */
 function sample(t: number, side: number, c: CurveConfig) {
@@ -1783,8 +1791,8 @@ function ServicesSection({
           const key = desktop ? "desktop" : tablet ? "tablet" : "mobile";
           const cfg = { ...DEFAULT_CURVE[key], ...curve?.[key] };
           motions.forEach((el, i) => {
-            // Desktop is two columns: left cards lean right, right cards lean left.
-            const side = desktop ? (i % 2 === 0 ? -1 : 1) : 0;
+            // Left cards lean right, right cards lean left (alternates in the single phone column too).
+            const side = i % 2 === 0 ? -1 : 1;
             buildCurve(el, side, cfg);
           });
         }
@@ -1875,6 +1883,48 @@ function ServicesSection({
           // 2b. Touch: the card nearest the middle of the screen becomes active
           cards.forEach((card) => {
             const media = inner(card);
+            const tilt = card.closest<HTMLElement>("[data-fw-tilt]");
+            if (fx && tilt) gsap.set(tilt, { transformPerspective: 900 });
+            const rx = fx && tilt ? gsap.quickTo(tilt, "rotationX", { duration: 0.6, ease: "power3" }) : null;
+            const ry = fx && tilt ? gsap.quickTo(tilt, "rotationY", { duration: 0.6, ease: "power3" }) : null;
+
+            // finger down / drag: spotlight + 3D tilt, like the mouse hover
+            const touchMove = (e: PointerEvent) => {
+              const r = card.getBoundingClientRect();
+              const nx = (e.clientX - r.left) / r.width - 0.5;
+              const ny = (e.clientY - r.top) / r.height - 0.5;
+              card.style.setProperty("--mx", `${(nx + 0.5) * 100}%`);
+              card.style.setProperty("--my", `${(ny + 0.5) * 100}%`);
+              ry?.(nx * 7);
+              rx?.(-ny * 7);
+            };
+            const touchEnd = () => {
+              rx?.(0);
+              ry?.(0);
+            };
+            card.addEventListener("pointerdown", touchMove);
+            card.addEventListener("pointermove", touchMove);
+            card.addEventListener("pointerup", touchEnd);
+            card.addEventListener("pointercancel", touchEnd);
+            card.addEventListener("pointerleave", touchEnd);
+
+            // media drifts with the scroll (stands in for the mouse parallax)
+            if (fx && media) {
+              gsap.fromTo(
+                media,
+                { yPercent: -3.5 },
+                { yPercent: 3.5, ease: "none", scrollTrigger: { trigger: card, start: "top bottom", end: "bottom top", scrub: true } }
+              );
+            }
+
+            cleanups.push(() => {
+              card.removeEventListener("pointerdown", touchMove);
+              card.removeEventListener("pointermove", touchMove);
+              card.removeEventListener("pointerup", touchEnd);
+              card.removeEventListener("pointercancel", touchEnd);
+              card.removeEventListener("pointerleave", touchEnd);
+            });
+
             ScrollTrigger.create({
               trigger: card,
               start: "center 65%",
@@ -1892,8 +1942,7 @@ function ServicesSection({
         return () => cleanups.forEach((fn) => fn());
       }
     );
-
-    let cancelled = false;
+let cancelled = false;
     document.fonts?.ready.then(() => {
       if (!cancelled) ScrollTrigger.refresh();
     });
@@ -1917,7 +1966,7 @@ function ServicesSection({
       </header>
 
       <ul
-        className={`mx-auto grid grid-cols-1 items-start gap-x-[clamp(1.25rem,2.5vw,2.5rem)] gap-y-[clamp(1.5rem,5vw,4.5rem)] lg:grid-cols-2 lg:[&>li:nth-child(even)]:mt-[clamp(2.5rem,7vw,7rem)] ${WIDTH}`}
+        className={`mx-auto grid grid-cols-1 items-start gap-x-[clamp(1.25rem,2.5vw,2.5rem)] gap-y-[clamp(1.5rem,5vw,4.5rem)] md:grid-cols-2 md:[&>li:nth-child(even)]:mt-[clamp(2.5rem,7vw,7rem)] ${WIDTH}`}
       >
         {services.map((service, i) => (
           <ServiceCard key={service.slug} service={service} index={i} />
@@ -2065,9 +2114,10 @@ function ProjectsWheel() {
       const W = root.clientWidth;
       const H = root.clientHeight;
       const cw = cards[0].offsetWidth || 300;
-      const cardY = Math.round(H * (W < 768 ? 0.72 : 0.7));
-      R = Math.max(W * 0.85, 520);
-      step = (cw * 1.16) / R;
+      const cardY = Math.round(H * (W < 480 ? 0.72 : W < 768 ? 0.70 : 0.70));
+      // Keep the wheel proportional on phones instead of forcing a 520px radius.
+      R = Math.max(W * (W < 480 ? 0.72 : W < 768 ? 0.78 : 0.85), W < 480 ? 260 : W < 768 ? 360 : 520);
+      step = (cw * (W < 480 ? 1.08 : 1.16)) / R;
       gsap.set(cards, { top: cardY, xPercent: -50, yPercent: -50 });
       Object.assign(ring.style, {
         width: `${R * 2}px`,
@@ -2419,40 +2469,31 @@ function ContactInfo() {
 }
 
 /* =====================================================================
-   WORDS SHOWCASE – Vision → Expertise → Success (pinned, GSAP scrub)
-   Text only: big word + sentence per slide.
+   WORDS SHOWCASE – Vision → Expertise → Success
+   Pinned "zoom-through tunnel": each word flies in from the distance,
+   holds at centre, then rushes past the camera as the next one appears.
    ===================================================================== */
 type WordSlide = {
   id: string;
   word: string;
-  lines: string[];
-  titleLeft: string; // left offset of the big word
-  subLeft: string; // left offset of the sub text
+  line: string;
 };
 
 const WORD_SLIDES: WordSlide[] = [
   {
     id: "vision",
     word: "Vision",
-    lines: ["Imagining bold possibilities, shaping creative ideas, and envisioning a smarter digital future."],
-    titleLeft: "15%",
-    subLeft: "23%",
+    line: "Imagining bold possibilities, shaping creative ideas, and envisioning a smarter digital future.",
   },
   {
     id: "expertise",
     word: "Expertise",
-    lines: [
-      "Combining technology, creativity, and expertise to deliver innovative solutions that move businesses forward.",
-    ],
-    titleLeft: "36%",
-    subLeft: "39%",
+    line: "Combining technology, creativity, and expertise to deliver innovative solutions that move businesses forward.",
   },
   {
     id: "success",
     word: "Success",
-    lines: ["Turning ideas into impact, challenges into opportunities, and ambitions into measurable digital growth."],
-    titleLeft: "14%",
-    subLeft: "20%",
+    line: "Turning ideas into impact, challenges into opportunities, and ambitions into measurable digital growth.",
   },
 ];
 
@@ -2483,44 +2524,78 @@ function WordsShowcase() {
 
     mm.add("(prefers-reduced-motion: no-preference)", () => {
       const slides = gsap.utils.toArray<HTMLElement>("[data-sw-slide]");
-      const GAP = 2.6; // timeline units between the start of one word and the next
+      const rings = gsap.utils.toArray<HTMLElement>("[data-sw-ring]");
+      const counter = root.querySelector<HTMLElement>("[data-sw-counter]");
+      const bar = root.querySelector<HTMLElement>("[data-sw-bar]");
+      const n = slides.length;
+
+      const GAP = 2.4; // timeline units between the start of consecutive words
+      const total = (n - 1) * GAP + 2;
+
+      // distance each letter travels away from the centre while converging / leaving
+      const spread = (k: number) => (i: number, _el: Element, list: ArrayLike<Element>) =>
+        (i - (list.length - 1) / 2) * k;
 
       const tl = gsap.timeline({
         defaults: { ease: "none" },
         scrollTrigger: {
           trigger: root,
           start: "top top",
-          end: () => `+=${window.innerHeight * slides.length * 1.6}`,
+          end: () => `+=${window.innerHeight * n * 1.5}`,
           pin: true,
-          scrub: 0.6,
+          scrub: 0.7,
           anticipatePin: 1,
           invalidateOnRefresh: true,
         },
       });
 
+      // Background rings expand for the whole scroll = constant "forward" motion
+      tl.fromTo(
+        rings,
+        { scale: 0.35 },
+        { scale: 2.6, duration: total, stagger: { each: total * 0.12, from: "start" }, ease: "none" },
+        0
+      );
+
+      // Progress line
+      if (bar) tl.fromTo(bar, { scaleY: 0 }, { scaleY: 1, duration: total, ease: "none" }, 0);
+
       slides.forEach((slide, i) => {
-        const chars = slide.querySelectorAll("[data-sw-ch]");
-        const lines = slide.querySelectorAll("[data-sw-line]");
-
-        // starting (hidden) state
-        gsap.set(chars, { opacity: 0, filter: "blur(14px)", yPercent: 25 });
-        gsap.set(lines, { opacity: 0, filter: "blur(10px)", y: 36, rotation: 2.5, transformOrigin: "0% 50%" });
-
+        const title = slide.querySelector<HTMLElement>("[data-sw-title]");
+        const chars = slide.querySelectorAll<HTMLElement>("[data-sw-ch]");
+        const line = slide.querySelector<HTMLElement>("[data-sw-line]");
         const t = i * GAP;
 
-        // ── ENTER ──
-        tl.to(chars, { opacity: 1, filter: "blur(0px)", yPercent: 0, duration: 1.1, stagger: 0.09, ease: "power2.out" }, t);
-        tl.to(lines, { opacity: 1, filter: "blur(0px)", y: 0, rotation: 0, duration: 1, stagger: 0.18, ease: "power2.out" }, t + 0.6);
+        // ── ENTER: emerges from the distance, letters converge ──
+        tl.fromTo(
+          title,
+          { scale: 0.25, opacity: 0, filter: "blur(22px)" },
+          { scale: 1, opacity: 1, filter: "blur(0px)", duration: 1.2, ease: "power2.out" },
+          t
+        );
+        tl.fromTo(chars, { x: spread(70) }, { x: 0, duration: 1.2, ease: "power3.out" }, t);
+        tl.fromTo(
+          line,
+          { opacity: 0, y: 40, filter: "blur(8px)" },
+          { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, ease: "power2.out" },
+          t + 0.7
+        );
 
-        // ── EXIT (the last word stays until the section unpins) ──
-        if (i < slides.length - 1) {
-          const out = t + 2.0;
-          tl.to(lines, { opacity: 0, filter: "blur(10px)", y: -24, duration: 0.7, stagger: 0.08, ease: "power1.in" }, out);
-          tl.to(chars, { opacity: 0, filter: "blur(14px)", yPercent: -20, duration: 0.8, stagger: 0.06, ease: "power1.in" }, out + 0.1);
+        // ── EXIT: rushes past the camera (last word stays until unpin) ──
+        if (i < n - 1) {
+          const out = t + 1.8;
+          tl.to(line, { opacity: 0, y: -30, filter: "blur(8px)", duration: 0.5, ease: "power1.in" }, out);
+          tl.to(title, { scale: 4.5, opacity: 0, filter: "blur(26px)", duration: 1, ease: "power2.in" }, out);
+          tl.to(chars, { x: spread(120), duration: 1, ease: "power2.in" }, out);
+
+          // roll the counter to the next number (inner column is n lines tall)
+          if (counter) {
+            tl.to(counter, { yPercent: -((i + 1) / n) * 100, duration: 0.6, ease: "power2.inOut" }, out + 0.4);
+          }
         }
       });
 
-      tl.to({}, { duration: 1 }); // short hold on the last word
+      tl.to({}, { duration: 0.2 }); // small hold on the last word
     });
 
     return () => mm.revert();
@@ -2530,20 +2605,39 @@ function WordsShowcase() {
     <section ref={rootRef} className="sw-section" aria-label="What we do">
       <style>{SW_CSS}</style>
 
+      {/* tunnel rings */}
+      <div className="sw-rings" aria-hidden="true">
+        {[0, 1, 2, 3].map((r) => (
+          <span key={r} data-sw-ring className="sw-ring" />
+        ))}
+      </div>
+
+      {/* counter + progress */}
+      <div className="sw-hud" aria-hidden="true">
+        <div className="sw-count">
+          <span className="sw-count-win">
+            <span data-sw-counter className="sw-count-inner">
+              {WORD_SLIDES.map((s, i) => (
+                <span key={s.id}>{String(i + 1).padStart(2, "0")}</span>
+              ))}
+            </span>
+          </span>
+          <span className="sw-count-total">/ {String(WORD_SLIDES.length).padStart(2, "0")}</span>
+        </div>
+        <span className="sw-track">
+          <span data-sw-bar className="sw-bar" />
+        </span>
+      </div>
+
       {WORD_SLIDES.map((s) => (
         <div key={s.id} data-sw-slide className="sw-slide">
           <div className="sw-text">
-            <div role="heading" aria-level={2} className="sw-title" style={{ "--tl": s.titleLeft } as CSSProperties}>
+            <div role="heading" aria-level={2} data-sw-title className="sw-title">
               <ShowWord text={s.word} />
             </div>
-
-            <div className="sw-sub" style={{ "--sl": s.subLeft } as CSSProperties}>
-              {s.lines.map((line) => (
-                <p key={line} data-sw-line className="sw-line">
-                  {line}
-                </p>
-              ))}
-            </div>
+            <p data-sw-line className="sw-line">
+              {s.line}
+            </p>
           </div>
         </div>
       ))}
@@ -2940,7 +3034,7 @@ const FW_CSS = `
 @media (prefers-reduced-motion: reduce) { .fw-drift-a, .fw-drift-b { animation: none; } }
 `;
 
-/* Words showcase (Vision / Expertise / Success) – scoped with "sw-" */
+/* Words showcase (Vision / Expertise / Success) – zoom-through tunnel, scoped with "sw-" */
 const SW_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
 
@@ -2953,53 +3047,210 @@ const SW_CSS = `
   color: #fff;
   font-family: 'Inter', ui-sans-serif, system-ui, 'Helvetica Neue', Arial, sans-serif;
 }
+
+/* tunnel rings */
+.sw-rings {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.sw-ring {
+  grid-area: 1 / 1;
+  width: min(70vw, 70svh);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(159, 237, 241, 0.18);
+  box-shadow: 0 0 60px rgba(118, 171, 174, 0.08) inset;
+  will-change: transform;
+}
+
+/* slides stacked in the centre */
 .sw-slide {
   position: absolute;
   inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 clamp(20px, 6vw, 96px);
+}
+.sw-text {
+  position: relative;
+  z-index: 1;
+  text-align: center;
   display: flex;
+  flex-direction: column;
   align-items: center;
 }
-.sw-text { position: relative; z-index: 1; width: 100%; padding-bottom: 4vh; }
 
-/* big word */
 .sw-title {
-  padding-left: var(--tl);
-  font-size: clamp(48px, min(14.5vw, 30svh), 250px);
+  font-size: clamp(52px, min(15vw, 30svh), 260px);
   font-weight: 200;
   line-height: 1.05;
   letter-spacing: -0.04em;
   white-space: nowrap;
+  transform-origin: 50% 50%;
+  will-change: transform, filter, opacity;
 }
-.sw-ch { display: inline-block; will-change: transform, filter, opacity; }
+.sw-ch { display: inline-block; will-change: transform; }
 
-/* sub text */
-.sw-sub { padding-left: var(--sl); padding-right: clamp(20px, 5vw, 80px); margin-top: clamp(16px, 3vh, 44px); }
 .sw-line {
-  margin: 0;
+  margin: clamp(16px, 3vh, 40px) 0 0;
+  max-width: 44ch;
   font-size: clamp(14px, 1.5vw, 22px);
   font-weight: 300;
-  line-height: 1.9;
-  color: #fff;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.85);
   will-change: transform, filter, opacity;
 }
 
-@media (max-width: 640px) {
-  .sw-title { padding-left: 6vw; font-size: clamp(44px, min(22vw, 26svh), 120px); }
-  .sw-sub { padding-left: 8vw; padding-right: 6vw; }
+/* HUD: odometer counter + progress line */
+.sw-hud {
+  position: absolute;
+  z-index: 2;
+  right: clamp(16px, 3vw, 48px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.sw-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(12px, 1vw, 14px);
+  letter-spacing: 0.12em;
+  line-height: 1.2em;
+  color: #fff;
+}
+/* window shows exactly one number; the inner column (3 lines tall) is rolled by GSAP */
+.sw-count-win { display: block; height: 1.2em; overflow: hidden; }
+.sw-count-inner { display: flex; flex-direction: column; will-change: transform; }
+.sw-count-inner span { display: block; height: 1.2em; line-height: 1.2em; }
+.sw-count-total { color: rgba(255, 255, 255, 0.4); }
+.sw-track {
+  position: relative;
+  width: 1px;
+  height: clamp(60px, 12vh, 120px);
+  background: rgba(255, 255, 255, 0.18);
+}
+.sw-bar {
+  position: absolute;
+  inset: 0;
+  background: #9fedf1;
+  transform-origin: top;
+  transform: scaleY(0);
 }
 
-@media (max-height: 500px) { .sw-line { line-height: 1.5; } }
+@media (max-width: 640px) {
+  .sw-title { font-size: clamp(44px, min(21vw, 26svh), 120px); }
+  .sw-hud { right: 12px; top: auto; bottom: 20px; transform: none; flex-direction: row-reverse; }
+  .sw-track { width: clamp(40px, 14vw, 80px); height: 1px; }
+  .sw-bar { transform-origin: left; transform: scaleX(0); }
+}
 
-/* reduced motion: no pinning, show every word stacked */
+/* reduced motion: no pinning, every word stacked */
 @media (prefers-reduced-motion: reduce) {
   .sw-section { height: auto; overflow: visible; }
   .sw-slide { position: relative; min-height: 100svh; }
+  .sw-rings, .sw-hud { display: none; }
 }
 `;
 
 /* =====================================================================
    7. PAGE (default export)
    ===================================================================== */
+const RESPONSIVE_CSS = `
+/* Responsive safeguards: preserve the original animation systems, fix layout only. */
+.home-root { width: 100%; max-width: 100%; overflow-x: clip; }
+.home-root *, .home-root *::before, .home-root *::after { box-sizing: border-box; }
+.home-root img, .home-root video, .home-root svg { max-width: 100%; }
+.home-root a, .home-root button { -webkit-tap-highlight-color: transparent; }
+.home-root button, .home-root a { touch-action: manipulation; }
+.home-root :focus-visible { outline: 2px solid #9fedf1; outline-offset: 4px; }
+
+.eae-reveal { min-height: 220svh; height: 260vh; }
+.eae-reveal-sticky { padding-inline: clamp(1.1rem, 6vw, 6rem); }
+.eae-reveal-text { overflow-wrap: anywhere; }
+.eae-bs { width: 100%; min-width: 0; }
+.eae-bs-row { width: 100%; }
+.eae-bs-slot { min-width: 0; }
+.eae-reviews, .eae-reviews * { min-width: 0; }
+.eae-reveal, .eae-bs, .eae-reviews, #services, #projects, #contact-info { max-width: 100%; }
+
+#services { scroll-margin-top: 1rem; }
+#services ul { width: min(100%, 88rem); }
+#services li { min-width: 0; }
+#services [data-fw-tilt] { transform-style: preserve-3d; }
+#projects { isolation: isolate; }
+#projects [data-pw-card] { max-width: calc(100vw - 2rem); }
+#contact-info a { overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+  .home-root { overflow-x: clip; }
+  .home-root h1, .home-root h2, .home-root h3 { overflow-wrap: anywhere; }
+  .home-root section { scroll-margin-top: 0; }
+  .eae-reveal { height: 220vh; min-height: 190svh; }
+  .eae-reveal-sticky { min-height: 100svh; padding: 2rem 1.25rem; }
+  .eae-reveal-text { font-size: clamp(1.65rem, 6vw, 2.5rem); line-height: 1.25; letter-spacing: -0.035em; }
+  .eae-bs { padding-inline: 1rem; }
+  .eae-bs-row { gap: .5rem; }
+  .eae-bs-slot { overflow: hidden; }
+  .eae-bs .eae-mk { max-width: 100%; font-size: clamp(.8rem, 3.2vw, 1.3rem); }
+  .eae-reviews { padding-inline: 1rem; }
+  #services { padding-inline: 1rem; }
+  #services header { align-items: flex-start; }
+  #services ul { grid-template-columns: minmax(0, 1fr); }
+  #services ul > li:nth-child(even) { margin-top: 0; }
+  #projects { height: 100svh; min-height: 640px; }
+  #projects .font-display { overflow-wrap: anywhere; }
+  #projects [data-pw-card] { width: min(68vw, 320px); }
+  #projects .pointer-events-none.relative.z-30 { padding-top: max(5.5rem, 10svh); }
+  #projects .pointer-events-auto { gap: 1.25rem; }
+  #projects .pointer-events-none.relative.z-30 > div[aria-live] { margin-top: 1rem; max-width: 100%; }
+  #projects .pointer-events-none.relative.z-30 > div[aria-live] p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #contact-info { border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; }
+  #contact-info > div { padding: 4rem 1.25rem; gap: 2.5rem; }
+  #contact-info .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 479px) {
+  .home-root section { min-width: 0; }
+  .home-root .hero-title { font-size: clamp(2rem, 10vw, 2.75rem); line-height: 1.08; }
+  .home-root section:first-of-type { min-height: 620px; }
+  .home-root section:first-of-type > div.mx-auto { padding-inline: 1.25rem; padding-bottom: 8.5rem; }
+  .home-root section:first-of-type > button[aria-label="Scroll down"] { bottom: .75rem; }
+  .home-root section:first-of-type > button[aria-label="Mute video"], 
+  .home-root section:first-of-type > button[aria-label="Unmute video"] { right: 1rem; bottom: 4.4rem; }
+  .eae-reveal-text { font-size: clamp(1.45rem, 6.2vw, 1.9rem); }
+  #projects { min-height: 680px; }
+  #projects [data-pw-card] { width: min(70vw, 270px); }
+  #projects .pointer-events-none.relative.z-30 { padding-top: 5.25rem; }
+  #projects .pointer-events-none.relative.z-30 > div[aria-live] p { font-size: .8rem; line-height: 1.45; }
+  #projects .absolute.inset-x-5.bottom-5 { left: 1rem; right: 1rem; }
+  #contact-info .text-4xl { font-size: 2rem; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  #services { padding-inline: 1.5rem; }
+  #projects [data-pw-card] { width: min(34vw, 360px); }
+  #contact-info > div { gap: 2.5rem; padding-inline: 2rem; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  #services [data-fw-tilt] { transform: none !important; }
+  #services [data-fw-cursor] { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-root *, .home-root *::before, .home-root *::after {
+    scroll-behavior: auto !important;
+  }
+}
+`;
+
 export default function Home() {
   // One global Lenis instance driven by GSAP's ticker (smooth scroll + ScrollTrigger sync).
   useEffect(() => {
@@ -3025,6 +3276,7 @@ export default function Home() {
       <style>{HOME_CSS}</style>
       <style dangerouslySetInnerHTML={{ __html: EAE_CSS }} />
       <style>{FW_CSS}</style>
+      <style>{RESPONSIVE_CSS}</style>
       <div className="grain" />
 
       {/* 1. HERO (video) */}

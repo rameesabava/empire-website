@@ -171,7 +171,7 @@ export default function Footer() {
       <div className={WRAP}>
         <div className="flex flex-col items-center justify-between gap-2 border-t border-white/15 py-7 text-center text-[15px] text-white/70 md:flex-row">
           <span>© 2026 Empire AE. All Rights Reserved.</span>
-          <span>Designed with precision by Empire AE</span>
+          <span>Designed by Empire AE</span>
         </div>
       </div>
     </footer>
