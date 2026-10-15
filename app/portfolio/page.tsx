@@ -167,7 +167,7 @@ export default function PortfolioPage() {
       `}</style>
 
       {/* ───────────── HERO ───────────── */}
-      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-12 sm:px-10 lg:pt-16">
+      <section className="mx-auto max-w-[88rem] px-6 pb-16 pt-32 sm:px-10 lg:pt-40">
         <nav className="fade-in flex items-center gap-2 text-sm text-[#EEEEEE]/55" aria-label="Breadcrumb">
           <Link href="/" className="transition-colors hover:text-[#76ABAE]">
             Home
@@ -356,8 +356,7 @@ export default function PortfolioPage() {
           </div>
         </div>
       </section>
-
-     
+    
     </main>
   );
 }

@@ -57,24 +57,44 @@ const STYLES = `
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-/* ---------- the bar ---------- */
+/* ---------- the bar: clear glass ----------
+   No solid fill. The page shows through, softened by blur. It stays easy
+   to notice because of: a slight darkening of what is behind it (so the
+   white text always has contrast), a bright edge, a top highlight and a
+   soft shadow underneath. */
 .em-bar {
   position: relative; height: 58px; width: 100%; margin-inline: auto;
   border-radius: 20px; overflow: hidden; pointer-events: auto;
-  background: rgba(118,171,174,.55);
-  -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  backdrop-filter: blur(16px) saturate(1.3);
-  border: 1px solid rgba(238,238,238,.2);
-  box-shadow: 0 12px 40px -12px rgba(0,0,0,.55), inset 0 1px 0 rgba(238,238,238,.25);
+  background:
+    linear-gradient(135deg, rgba(238,238,238,.16) 0%, rgba(238,238,238,.04) 45%, rgba(238,238,238,.10) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6) brightness(.82);
+  backdrop-filter: blur(18px) saturate(1.6) brightness(.82);
+  border: 1px solid rgba(238,238,238,.38);
+  box-shadow:
+    0 14px 40px -14px rgba(0,0,0,.55),
+    0 0 0 1px rgba(34,40,49,.18),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -1px 0 rgba(34,40,49,.25);
   color: var(--text);
-  text-shadow: 0 1px 2px rgba(34,40,49,.3);
-  transition: width .7s var(--ease), background .4s, box-shadow .4s, transform .5s var(--ease-out);
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
+  transition: width .7s var(--ease), background .4s, border-color .4s, box-shadow .4s, transform .5s var(--ease-out);
 }
 .em-bar[data-compact="true"] { width: 116px; cursor: pointer; }
 .em-bar[data-compact="true"]:hover {
-  background: rgba(118,171,174,.72);
-  box-shadow: 0 16px 46px -10px rgba(118,171,174,.55), inset 0 1px 0 rgba(238,238,238,.3);
+  background:
+    linear-gradient(135deg, rgba(238,238,238,.26) 0%, rgba(238,238,238,.08) 45%, rgba(118,171,174,.22) 100%);
+  border-color: rgba(238,238,238,.6);
+  box-shadow:
+    0 16px 46px -10px rgba(118,171,174,.5),
+    0 0 0 1px rgba(34,40,49,.18),
+    inset 0 1px 0 rgba(255,255,255,.65),
+    inset 0 -1px 0 rgba(34,40,49,.25);
   transform: translateY(2px) scale(1.04);
+}
+
+/* browsers without backdrop-filter: fall back to a light tint so it never vanishes */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .em-bar { background: rgba(34,40,49,.55); }
 }
 
 /* ---------- logo (glides from left to centre) ---------- */
@@ -85,7 +105,7 @@ const STYLES = `
   transition: left .7s var(--ease), transform .7s var(--ease);
 }
 .em-bar[data-compact="true"] .em-logo { left: 50%; transform: translateX(-50%); }
-.em-logo img { display: block; height: 38px; width: auto; transition: transform .5s var(--ease-out); }
+.em-logo img { display: block; height: 38px; width: auto; transition: transform .5s var(--ease-out); filter: drop-shadow(0 1px 3px rgba(0,0,0,.35)); }
 .em-bar[data-compact="true"]:hover .em-logo img { transform: scale(1.06); }
 
 /* ---------- parts that fade out when compact ---------- */
@@ -112,7 +132,9 @@ const STYLES = `
 }
 .em-ind {
   position: absolute; top: 50%; left: 0; height: 40px; margin-top: -20px; border-radius: 12px;
-  background: rgba(34,40,49,.38);
+  background: rgba(238,238,238,.16);
+  border: 1px solid rgba(238,238,238,.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
   width: var(--w, 0px); transform: translateX(var(--x, 0px)); opacity: 0;
   transition: transform .5s var(--ease-out), width .5s var(--ease-out), opacity .25s;
 }
@@ -124,15 +146,18 @@ const STYLES = `
 .em-cta {
   position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: .5rem;
   height: 46px; padding: 0 1.5rem; border-radius: 9999px;
-  background: var(--accent); color: var(--bg); font-weight: 700; font-size: .95rem; text-shadow: none;
+  background: rgba(255,255,255,.62); color: #1d232b; font-weight: 700; font-size: .95rem; text-shadow: none;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.75);
+  box-shadow: 0 6px 18px -8px rgba(34,40,49,.5), inset 0 1px 0 rgba(255,255,255,.9);
   transition: background .3s, transform .35s var(--ease-out), box-shadow .3s;
 }
 .em-cta::after {
   content: ''; position: absolute; inset: 0; transform: translateX(-120%);
-  background: linear-gradient(100deg, transparent 30%, rgba(238,238,238,.55) 50%, transparent 70%);
+  background: linear-gradient(100deg, transparent 30%, rgba(118,171,174,.35) 50%, transparent 70%);
   transition: transform .7s var(--ease-out);
 }
-.em-cta:hover { background: var(--text); transform: translateY(-1px); box-shadow: 0 8px 22px -8px rgba(34,40,49,.6); }
+.em-cta:hover { background: #ffffff; transform: translateY(-1px); box-shadow: 0 8px 22px -8px rgba(34,40,49,.5), inset 0 1px 0 #fff; }
 .em-cta:hover::after { transform: translateX(120%); }
 .em-cta svg { width: 16px; height: 16px; transition: transform .35s var(--ease-out); }
 .em-cta:hover svg { transform: translateX(3px); }
@@ -140,19 +165,20 @@ const STYLES = `
 /* burger (shown below 1024px) */
 .em-burger {
   position: relative; width: 46px; height: 46px; border-radius: 14px;
-  background: rgba(34,40,49,.32); color: var(--text); transition: background .3s;
+  background: rgba(238,238,238,.14); border: 1px solid rgba(238,238,238,.28);
+  color: var(--text); transition: background .3s;
 }
-.em-burger:hover { background: rgba(34,40,49,.5); }
+.em-burger:hover { background: rgba(238,238,238,.26); }
 .em-burger span {
-  position: absolute; left: 14px; right: 14px; height: 2px; border-radius: 2px; background: currentColor;
+  position: absolute; left: 13px; right: 13px; height: 2px; border-radius: 2px; background: currentColor;
   transition: transform .45s var(--ease-out), top .45s var(--ease-out), opacity .2s;
 }
-.em-burger span:nth-child(1) { top: 17px; }
-.em-burger span:nth-child(2) { top: 22px; }
-.em-burger span:nth-child(3) { top: 27px; }
-.em-burger[aria-expanded="true"] span:nth-child(1) { top: 22px; transform: rotate(45deg); }
+.em-burger span:nth-child(1) { top: 16px; }
+.em-burger span:nth-child(2) { top: 21px; }
+.em-burger span:nth-child(3) { top: 26px; }
+.em-burger[aria-expanded="true"] span:nth-child(1) { top: 21px; transform: rotate(45deg); }
 .em-burger[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
-.em-burger[aria-expanded="true"] span:nth-child(3) { top: 22px; transform: rotate(-45deg); }
+.em-burger[aria-expanded="true"] span:nth-child(3) { top: 21px; transform: rotate(-45deg); }
 
 @media (min-width: 1024px) {
   .em-links-pos { display: flex; }
@@ -160,16 +186,18 @@ const STYLES = `
 }
 @media (max-width: 479px) { .em-cta { padding: 0 1.1rem; } }
 
-/* ---------- mobile / tablet dropdown ---------- */
+/* ---------- mobile / tablet dropdown (clear glass too) ---------- */
 .em-panel-wrap { display: grid; grid-template-rows: 0fr; margin-top: 10px; transition: grid-template-rows .55s var(--ease-out); }
 .em-panel-wrap[data-open="true"] { grid-template-rows: 1fr; }
 .em-panel-clip { overflow: hidden; min-height: 0; }
 .em-panel {
   pointer-events: auto; border-radius: 20px; padding: .6rem;
-  background: rgba(34,40,49,.92);
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
-  border: 1px solid rgba(238,238,238,.14);
-  box-shadow: 0 20px 50px -16px rgba(0,0,0,.6);
+  background: linear-gradient(135deg, rgba(238,238,238,.14), rgba(238,238,238,.04));
+  -webkit-backdrop-filter: blur(20px) saturate(1.6) brightness(.7);
+  backdrop-filter: blur(20px) saturate(1.6) brightness(.7);
+  border: 1px solid rgba(238,238,238,.32);
+  box-shadow: 0 20px 50px -16px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.45);
+  text-shadow: 0 1px 3px rgba(0,0,0,.45);
 }
 .em-panel a {
   display: flex; align-items: center; justify-content: space-between;
@@ -178,10 +206,53 @@ const STYLES = `
   transition: opacity .4s ease, transform .5s var(--ease-out), background .25s, color .25s;
 }
 .em-panel-wrap[data-open="true"] .em-panel a { opacity: 1; transform: none; transition-delay: calc(.12s + var(--i, 0) * 55ms), calc(.12s + var(--i, 0) * 55ms), 0s, 0s; }
-.em-panel a:hover { background: rgba(118,171,174,.16); color: var(--accent); }
+.em-panel a:hover { background: rgba(238,238,238,.14); color: var(--accent); }
 .em-panel a[aria-current="page"] { color: var(--accent); }
 .em-panel a[aria-current="page"]::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: var(--accent); }
 @media (min-width: 1024px) { .em-panel-wrap { display: none; } }
+
+/* ---------- light theme: bar sits over a light background ----------
+   Set automatically from the colour under the bar. Text turns dark,
+   the glass turns white-tinted. */
+.em-nav[data-theme="light"] { --text: #14181f; --accent-ink: #3b7e82; }
+.em-nav .em-panel a:hover, .em-nav .em-panel a[aria-current="page"] { color: var(--accent-ink, var(--accent)); }
+.em-nav[data-theme="light"] .em-bar {
+  background: linear-gradient(135deg, rgba(255,255,255,.6) 0%, rgba(255,255,255,.28) 100%);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5) brightness(1.04);
+  backdrop-filter: blur(18px) saturate(1.5) brightness(1.04);
+  border-color: rgba(20,24,31,.14);
+  box-shadow:
+    0 14px 40px -16px rgba(20,24,31,.3),
+    0 0 0 1px rgba(255,255,255,.45),
+    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 -1px 0 rgba(20,24,31,.06);
+  text-shadow: none;
+}
+.em-nav[data-theme="light"] .em-bar[data-compact="true"]:hover {
+  background: linear-gradient(135deg, rgba(255,255,255,.8) 0%, rgba(255,255,255,.45) 100%);
+  border-color: rgba(20,24,31,.22);
+  box-shadow: 0 16px 46px -12px rgba(20,24,31,.35), 0 0 0 1px rgba(255,255,255,.5), inset 0 1px 0 #fff, inset 0 -1px 0 rgba(20,24,31,.06);
+}
+.em-nav[data-theme="light"] .em-ind {
+  background: rgba(20,24,31,.07); border-color: rgba(20,24,31,.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+}
+.em-nav[data-theme="light"] .em-burger { background: rgba(20,24,31,.06); border-color: rgba(20,24,31,.16); }
+.em-nav[data-theme="light"] .em-burger:hover { background: rgba(20,24,31,.12); }
+.em-nav[data-theme="light"] .em-cta {
+  background: rgba(255,255,255,.78); border-color: rgba(20,24,31,.12);
+  box-shadow: 0 6px 18px -8px rgba(20,24,31,.3), inset 0 1px 0 #fff;
+}
+.em-nav[data-theme="light"] .em-cta:hover { background: #ffffff; }
+.em-nav[data-theme="light"] .em-panel {
+  background: linear-gradient(135deg, rgba(255,255,255,.7), rgba(255,255,255,.4));
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) brightness(1.04);
+  backdrop-filter: blur(20px) saturate(1.5) brightness(1.04);
+  border-color: rgba(20,24,31,.14);
+  box-shadow: 0 20px 50px -18px rgba(20,24,31,.3), inset 0 1px 0 #fff;
+  text-shadow: none;
+}
+.em-nav[data-theme="light"] .em-panel a:hover { background: rgba(20,24,31,.06); }
 
 /* ---------- focus + reduced motion ---------- */
 .em-nav a:focus-visible, .em-nav button:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; border-radius: 12px; }
@@ -215,7 +286,9 @@ export default function Header() {
     const compact = scrolled && !pinnedOpen;
 
     const navRef = useRef<HTMLElement>(null);
+    const barRef = useRef<HTMLDivElement>(null);
     const openedAt = useRef(0);
+    const [light, setLight] = useState(false); // bar is over a light background
 
     /* ---- scroll behaviour ---- */
     useEffect(() => {
@@ -240,6 +313,70 @@ export default function Header() {
             if (raf) cancelAnimationFrame(raf);
         };
     }, []);
+
+    /* ---- detect light / dark background under the bar ---- */
+    useEffect(() => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+        // Normalises any CSS colour (rgb, hex, oklch, …) to RGBA via canvas.
+        const toRGBA = (css: string) => {
+            if (!ctx) return null;
+            ctx.clearRect(0, 0, 1, 1);
+            ctx.fillStyle = "rgba(0,0,0,0)";
+            ctx.fillStyle = css;
+            ctx.fillRect(0, 0, 1, 1);
+            const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
+            return { r, g, b, a: a / 255 };
+        };
+        const isLightColor = (c: { r: number; g: number; b: number }) =>
+            (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255 > 0.6;
+
+        /** true = light, false = dark, based on what is painted at (x, y). */
+        const lightAt = (x: number, y: number): boolean => {
+            const stack = document.elementsFromPoint(x, y).filter(
+                (el) => !navRef.current?.contains(el)
+            );
+            for (const el of stack) {
+                const themed = el.closest<HTMLElement>("[data-nav-theme]");
+                if (themed) return themed.dataset.navTheme === "light";
+                if (/^(IMG|VIDEO|CANVAS|PICTURE)$/.test(el.tagName)) return false;
+                const cs = getComputedStyle(el);
+                if (cs.backgroundImage !== "none") return false; // photo / gradient
+                const c = toRGBA(cs.backgroundColor);
+                if (c && c.a > 0.6) return isLightColor(c);
+            }
+            return true; // nothing painted: browser default is white
+        };
+
+        let raf = 0;
+        const check = () => {
+            raf = 0;
+            const bar = barRef.current;
+            if (!bar) return;
+            const r = bar.getBoundingClientRect();
+            const y = r.top + r.height / 2;
+            const xs = [0.2, 0.5, 0.8].map((f) => r.left + r.width * f);
+            const votes = xs.filter((x) => lightAt(x, y)).length;
+            setLight(votes >= 2);
+        };
+        const schedule = () => {
+            if (!raf) raf = requestAnimationFrame(check);
+        };
+
+        check();
+        window.addEventListener("scroll", schedule, { passive: true });
+        window.addEventListener("resize", schedule);
+        // catches colour changes that happen without scrolling (hover effects, route changes)
+        const timer = window.setInterval(schedule, 300);
+        return () => {
+            window.removeEventListener("scroll", schedule);
+            window.removeEventListener("resize", schedule);
+            window.clearInterval(timer);
+            if (raf) cancelAnimationFrame(raf);
+        };
+    }, [pathname]);
 
     /* ---- close things on outside click / Escape ---- */
     useEffect(() => {
@@ -324,10 +461,15 @@ export default function Header() {
     }, [activeIndex, moveTo]);
 
     return (
-        <header ref={navRef} className="em-nav">
+        <header
+            ref={navRef}
+            className="em-nav"
+            data-theme={light ? "light" : "dark"}
+        >
             <style dangerouslySetInnerHTML={{ __html: STYLES }} />
 
             <div
+                ref={barRef}
                 className="em-bar"
                 data-compact={compact}
                 onClick={onBarClick}
