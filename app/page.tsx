@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 "use client";
 
@@ -431,3 +432,13 @@ export default function Home() {
   );
 }
 
+=======
+export default function Home() {
+    return (
+        <main>
+            <h1>Empire Website</h1>
+            <p>Welcome to our website.</p>
+        </main>
+    );
+}
+>>>>>>> 4485c41 (services Page , new header, team page)

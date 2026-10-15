@@ -41,3 +41,21 @@ body {
 *::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
 }
+
+
+/* ---------- Smooth page scrolling ---------- */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+}
+
+.sv-root {
+  scroll-behavior: smooth;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
