@@ -4,15 +4,15 @@ import React, { useCallback, useEffect, useRef } from "react";
 /* ---------- Data: replace images/names with your real team ---------- */
 type Member = { name: string; role: string; image: string };
 
-const MANAGER = {
-  name: "Sujin P M",
-  role: "Founder & CEO",
-  image: "/team/manager.jpg",
-  quotes: [
-    "We don't just build projects, we build trust that lasts.",
-    "Great results come from a team that genuinely cares.",
-  ],
-};
+// const MANAGER = {
+//   name: "Sujin P M",
+//   role: "Founder & CEO",
+//   image: "/team/manager.jpg",
+//   quotes: [
+//     "We don't just build projects, we build trust that lasts.",
+//     "Great results come from a team that genuinely cares.",
+//   ],
+// };
 
 const TEAM_QUOTE = "Behind every successful project is a team that refuses to settle.";
 
@@ -22,24 +22,40 @@ const TEAM: Member[] = [
   { name: "Arya P U", role: "Graphic Designer", image: "/team/Arya.jpeg" },
   { name: "Arjun Shaji", role: "Digital Marketing Executive", image: "/team/Arjun.jpeg" },
   { name: "Aslam K M", role: "Flutter Developer", image: "/team/Aslam.jpeg" },
-  { name: "Member Six", role: "Marketing Lead", image: "/team/6.jpg" },
-  { name: "Member Seven", role: "QA Engineer", image: "/team/7.jpg" },
-  { name: "Member Eight", role: "Customer Success", image: "/team/8.jpg" },
+  { name: "Muhammed Nabeel", role: "Python Developer", image: "/team/nebin.jpeg" },
+  { name: "Silpa Raji", role: "Content Creator", image: "/team/shilpa.png" },
+  { name: "Gayathri Harsha M", role: "Business Development Executive", image: "/team/Gayathri.jpeg" },
+  { name: "Karishma H.K", role: "Business Development Executive", image: "/team/Karishma.jpeg" },
+  { name: "Nidheesh Krishna N", role: "Flutter Developer", image: "/team/nidheesh.png" },
+  { name: "Bijin Mohan", role: "Business Development Manager", image: "/team/Bijin.jpeg" },
+  { name: "Raina Ranjan", role: "Software Tester", image: "/team/Raina Ranjan.jpeg" },
+  { name: "Nahla Nasarin K.N", role: "Operation Executive", image: "/team/Nahla.jpeg" },
+  { name: "J Mahadev", role: "Operation Executive", image: "/team/Mahadevan.png" },
+  { name: "Sonamol C M", role: "Backend Developer", image: "/team/Sona.jpeg" },
+  { name: "Nicy K kabir", role: "Flutter Developer", image: "/team/Nicy.jpeg" },
+  { name: "Shilpa P R", role: "Software Tester", image: "/team/Shilpapr.jpeg" },
+  { name: "Jabzeena M A", role: "Python Developer", image: "/team/Jabzee.jpeg" },
+  { name: "Jemson Jacob", role: "Flutter Developer", image: "/team/Jemson.png" },
+  { name: "Alen Shaji", role: "Operations Assistant", image: "/team/Alen.jpeg" },
+  { name: "Soji Kurian", role: "Digital Marketing Executive", image: "/team/soji.PNG" },
+  { name: "Tony", role: "Digital Marketing Executive", image: "/team/Tony.PNG" },
+  { name: "Shyamil K V", role: "Accountant", image: "/team/Shyamil.png" },
+  { name: "Nandhana", role: "Digital Marketing", image: "/team/Nandhana.jpeg" },
 ];
 
 /* ---------- Components ---------- */
-const ManagerSection: React.FC = () => (
-  <section className="team-manager">
-    <img className="team-manager__photo" src={MANAGER.image} alt={MANAGER.name} />
-    <div className="team-manager__body">
-      {MANAGER.quotes.map((q) => (
-        <blockquote key={q}>“{q}”</blockquote>
-      ))}
-      <p className="team-manager__name">{MANAGER.name}</p>
-      <p className="team-manager__role">{MANAGER.role}</p>
-    </div>
-  </section>
-);
+// const ManagerSection: React.FC = () => (
+//   <section className="team-manager">
+//     <img className="team-manager__photo" src={MANAGER.image} alt={MANAGER.name} />
+//     <div className="team-manager__body">
+//       {MANAGER.quotes.map((q) => (
+//         <blockquote key={q}>“{q}”</blockquote>
+//       ))}
+//       <p className="team-manager__name">{MANAGER.name}</p>
+//       <p className="team-manager__role">{MANAGER.role}</p>
+//     </div>
+//   </section>
+// );
 
 const QuoteSection: React.FC = () => (
   <section className="team-quote">
@@ -196,7 +212,7 @@ const TeamStrip: React.FC = () => {
 const OurTeam: React.FC = () => (
   <main className="team-page">
     <style>{css}</style>
-    <ManagerSection />
+    
     <QuoteSection />
     <TeamStrip />
   </main>
