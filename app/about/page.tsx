@@ -1,16 +1,28 @@
 "use client";
 
 /**
- * About page – Empire AE
- * ----------------------
- * Where to put it:  app/about/page.tsx   (Next.js App Router + Tailwind CSS)
- *
+ * About page – Empire AE  (responsive version)
+ * --------------------------------------------
+ * 
  * How the animation works (no timers, no auto-play):
  *   Every animation is driven by ONE number: how far the user has scrolled
  *   through a section (0 = not started, 1 = finished).
  *   The hook `useScrollProgress` gives you that number, and each section
  *   turns it into a style (size, opacity, counter value, line width).
  *   Scroll up -> animation plays backwards. Stop scrolling -> it stops.
+ *
+ * What changed for responsiveness (search for "RESPONSIVE" in the code):
+ *   1. Pinned screens use 100dvh (the real visible height on phones, where
+ *      the browser bar slides in and out) and sections use svh (stable).
+ *   2. "Who We Are" screens only pin when the screen is big enough to hold
+ *      their content. On short or narrow screens they scroll normally and
+ *      the animation is driven by the scroll position instead, so nothing
+ *      gets clipped.
+ *   3. Hero panel start size is set with CSS variables, so phones, tablets,
+ *      desktops and landscape phones each get their own starting shape.
+ *   4. Buttons go full width on small phones, spacing and padding shrink.
+ *   5. The strike-through in "What Sets Us Apart" now follows wrapped lines.
+ *   6. The CTA panel margin scales with the screen width.
  */
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
@@ -42,19 +54,36 @@ const mapRange = (
 ) => outMin + clamp((p - inMin) / (inMax - inMin)) * (outMax - outMin);
 
 /**
- * useScrollProgress – returns [ref, progress]
+ * RESPONSIVE – when is a screen big enough to be "pinned"?
+ * Pinned screens hold their content still while you scroll. That only works
+ * if all the content fits inside the visible screen, so these two sections
+ * pin only when the window is big enough. Otherwise they scroll normally.
+ * (The same queries are used in the CSS block further down.)
+ */
+const INTRO_PIN_QUERY = "(min-height: 560px)";
+const DETAILS_PIN_QUERY = "(min-width: 768px) and (min-height: 640px)";
+
+/**
+ * useScrollProgress – returns [ref, progress, pinned]
  *
  * mode "through": 0 when the element enters the bottom of the screen,
  *                 1 when it has fully left the top.
  * mode "pinned":  0 when the element's top reaches the top of the screen,
  *                 1 when its bottom reaches the bottom.
  *                 Use it on a tall wrapper that contains a <PinnedStage>.
+ *
+ * pinQuery (optional, "pinned" mode only): a media query. When it does NOT
+ * match, the section is not pinned, so progress is measured while the
+ * section scrolls normally across the screen. `pinned` tells you which
+ * case you are in.
  */
 function useScrollProgress<T extends HTMLElement>(
-  mode: "through" | "pinned" = "through"
+  mode: "through" | "pinned" = "through",
+  pinQuery?: string
 ) {
   const ref = useRef<T>(null);
   const [progress, setProgress] = useState(0);
+  const [pinned, setPinned] = useState(mode === "pinned");
 
   useEffect(() => {
     // People who prefer less motion see the finished state right away.
@@ -70,10 +99,21 @@ function useScrollProgress<T extends HTMLElement>(
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight;
 
-      const value =
-        mode === "pinned"
-          ? -rect.top / (rect.height - vh)
-          : (vh - rect.top) / (rect.height + vh);
+      const isPinned =
+        mode === "pinned" &&
+        (!pinQuery || window.matchMedia(pinQuery).matches);
+      setPinned(isPinned);
+
+      let value: number;
+      if (isPinned) {
+        value = -rect.top / Math.max(1, rect.height - vh);
+      } else if (mode === "pinned") {
+        // Not pinned: starts when the top is 85% down the screen and
+        // finishes when the bottom reaches 35% down the screen.
+        value = (vh * 0.85 - rect.top) / (vh * 0.5 + rect.height);
+      } else {
+        value = (vh - rect.top) / (rect.height + vh);
+      }
 
       setProgress(reduceMotion ? 1 : clamp(value));
     };
@@ -92,9 +132,9 @@ function useScrollProgress<T extends HTMLElement>(
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
-  }, [mode]);
+  }, [mode, pinQuery]);
 
-  return [ref, progress] as const;
+  return [ref, progress, pinned] as const;
 }
 
 /* ------------------------------------------------------------------ */
@@ -213,21 +253,58 @@ const CTA = {
 /** Heading style used everywhere: semibold, tight spacing (site font is inherited). */
 const headingClass = "font-semibold tracking-tight";
 
+/**
+ * RESPONSIVE – layout rules for the two "Who We Are" screens.
+ *
+ * Small / short screens (default): the screen is a normal block that scrolls.
+ * Big enough screens (media query): the section becomes tall and its stage
+ * is fixed to the visible screen while you scroll (the pinned effect).
+ *
+ * svh = height with the phone browser bar showing (never changes, so the
+ *       page doesn't jump while scrolling).
+ * dvh = height that is visible right now (what the pinned stage should fill).
+ *
+ * Keep these media queries in sync with INTRO_PIN_QUERY / DETAILS_PIN_QUERY.
+ */
+const PIN_CSS = `
+.pin-intro-section { height: auto; }
+.pin-intro-stage   { position: relative; padding: 6rem 0; }
+@media (min-height: 560px) {
+  .pin-intro-section { height: 170svh; }
+  .pin-intro-stage {
+    position: absolute; top: 0; left: 0; right: 0; height: 100dvh;
+    padding: 5rem 0 0; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+}
+
+.pin-details-section { height: auto; }
+.pin-details-stage   { position: relative; padding: 4rem 0; }
+@media (min-width: 768px) and (min-height: 640px) {
+  .pin-details-section { height: 190svh; }
+  .pin-details-stage {
+    position: absolute; top: 0; left: 0; right: 0; height: 100dvh;
+    padding: 6rem 0 0; overflow: hidden;
+  }
+}
+`;
+
 /** Small text above a heading ("Who We Are", "Milestones", ...). */
 function SectionLabel({ children, light = false }: { children: ReactNode; light?: boolean }) {
   return (
-    <p className={`mb-5 text-base ${light ? "text-[#a3a3a3]" : "text-[#6b6b6b]"}`}>
+    <p className={`mb-4 text-sm md:mb-5 md:text-base ${light ? "text-[#a3a3a3]" : "text-[#6b6b6b]"}`}>
       {children}
     </p>
   );
 }
 
-/** Dark filled button + outlined button, used in two places. */
+/** Dark filled button + outlined button, used in two places.
+ *  RESPONSIVE: full width on small phones, natural width from `sm` up. */
 function PrimaryButton({ href, children, onDark = false }: { href: string; children: ReactNode; onDark?: boolean }) {
   return (
     <Link
       href={href}
-      className={`inline-block rounded-full px-8 py-4 text-base font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 ${
+      className={`inline-block w-full rounded-full px-6 py-3.5 text-center text-base font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 sm:w-auto md:px-8 md:py-4 ${
         onDark
           ? "bg-white text-black hover:bg-[#d4d4d4] focus-visible:outline-white"
           : "bg-[#000000] text-[#ffffff] hover:bg-[#262626] focus-visible:outline-[#000000]"
@@ -242,7 +319,7 @@ function SecondaryButton({ href, children, onDark = false }: { href: string; chi
   return (
     <Link
       href={href}
-      className={`inline-block rounded-full border px-8 py-4 text-base font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 ${
+      className={`inline-block w-full rounded-full border px-6 py-3.5 text-center text-base font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 sm:w-auto md:px-8 md:py-4 ${
         onDark
           ? "border-[#ffffff]/40 text-[#ffffff] hover:bg-[#ffffff]/10 focus-visible:outline-[#ffffff]"
           : "border-[#000000]/30 text-[#000000] hover:bg-[#000000]/5 focus-visible:outline-[#000000]"
@@ -261,14 +338,20 @@ function SecondaryButton({ href, children, onDark = false }: { href: string; chi
  * Here we move the stage down ourselves. The move is written straight to the
  * element (not through React state) so it stays perfectly in sync with the
  * smooth scroll.
+ *
+ * RESPONSIVE: the caller supplies the layout classes (position, height).
+ * If `pinQuery` is given and does not match, the stage is left alone so the
+ * section scrolls like a normal block.
  */
 function PinnedStage({
   sectionRef,
   className = "",
+  pinQuery,
   children,
 }: {
   sectionRef: RefObject<HTMLElement | null>;
   className?: string;
+  pinQuery?: string;
   children: ReactNode;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -278,6 +361,12 @@ function PinnedStage({
       const section = sectionRef.current;
       const stage = stageRef.current;
       if (!section || !stage) return;
+
+      if (pinQuery && !window.matchMedia(pinQuery).matches) {
+        stage.style.transform = "none";
+        return;
+      }
+
       const rect = section.getBoundingClientRect();
       const y = clamp(-rect.top, 0, Math.max(0, rect.height - window.innerHeight));
       stage.style.transform = `translate3d(0, ${y}px, 0)`;
@@ -290,13 +379,10 @@ function PinnedStage({
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [sectionRef]);
+  }, [sectionRef, pinQuery]);
 
   return (
-    <div
-      ref={stageRef}
-      className={`absolute inset-x-0 top-0 h-screen overflow-hidden ${className}`}
-    >
+    <div ref={stageRef} className={className}>
       {children}
     </div>
   );
@@ -365,8 +451,8 @@ function ScrollRow({ children }: { children: (progress: number) => ReactNode }) 
   const contentOpacity = mapRange(p, 0.3, 0.5, 0.25, 1);
 
   return (
-    <li ref={ref} className="pb-12 md:pb-16">
-      <div className="mb-8 h-px bg-[#e5e5e5]">
+    <li ref={ref} className="pb-10 md:pb-16">
+      <div className="mb-6 h-px bg-[#e5e5e5] md:mb-8">
         <div className="h-px bg-[#000000]" style={{ width: `${lineWidth}%` }} />
       </div>
       <div style={{ opacity: contentOpacity }}>{children(p)}</div>
@@ -379,6 +465,7 @@ function ScrollRow({ children }: { children: (progress: number) => ReactNode }) 
  * jumping. It only changes HOW the page scrolls; all the effects above keep
  * working because they just read the scroll position.
  * lerp: lower = smoother and slower (0.05 - 0.15 is a good range).
+ * (Lenis leaves touch scrolling native, so phones keep their normal feel.)
  */
 function SmoothScroll() {
   useEffect(() => {
@@ -409,13 +496,20 @@ function SmoothScroll() {
 /* 5. Sections                                                         */
 /* ------------------------------------------------------------------ */
 
-/** HERO – headline, then a video panel opens to full screen and its text fades in. */
+/**
+ * HERO – headline, then a video panel opens to full screen and its text fades in.
+ *
+ * RESPONSIVE: the panel's starting shape comes from two CSS variables:
+ *   --hero-top   how much is cut from the top (more on phones, because the
+ *                headline wraps onto more lines there)
+ *   --hero-side  how much is cut from left and right
+ * The scroll then shrinks both to 0 with `calc(var(...) * amount)`.
+ */
 function Hero() {
   const [ref, p] = useScrollProgress<HTMLElement>("pinned");
 
   // The panel opens up to the whole screen during the first 65% of the scroll.
-  const insetSides = mapRange(p, 0, 0.65, 8, 0); // % cut from left and right
-  const insetTop = mapRange(p, 0, 0.65, 46, 0); // % cut from the top
+  const open = mapRange(p, 0, 0.65, 1, 0); // 1 = small panel, 0 = full screen
   const radius = mapRange(p, 0, 0.65, 24, 0); // px
   const headlineShift = mapRange(p, 0.3, 0.65, 0, -12); // headline drifts up (vh)
   const headlineFade = mapRange(p, 0.3, 0.6, 1, 0);
@@ -425,19 +519,31 @@ function Hero() {
 
   // Negative margins cancel the page margins, so the hero is full screen width.
   return (
-    <section ref={ref} className="relative -mx-6 h-[170vh] md:-mx-12 lg:-mx-24 xl:-mx-32">
-      <PinnedStage sectionRef={ref}>
+    <section
+      ref={ref}
+      className="relative -mx-6 h-[170svh] md:-mx-12 lg:-mx-24 xl:-mx-32"
+    >
+      <PinnedStage
+        sectionRef={ref}
+        className="
+          absolute inset-x-0 top-0 h-[100dvh] overflow-hidden
+          [--hero-top:52%] [--hero-side:4%]
+          sm:[--hero-top:48%]
+          md:[--hero-top:46%] md:[--hero-side:8%]
+          [@media(max-height:520px)]:[--hero-top:62%]
+        "
+      >
         {/* Headline */}
         <div
-          className="absolute inset-x-0 top-0 px-6 pt-28 md:px-12 lg:px-24 xl:px-32"
+          className="absolute inset-x-0 top-0 px-6 pt-24 md:px-12 md:pt-28 lg:px-24 xl:px-32"
           style={{
             transform: `translateY(${headlineShift}vh)`,
             opacity: headlineFade,
           }}
         >
-          <p className="mb-4 text-base text-[#6b6b6b]">{HERO.since}</p>
+          <p className="mb-3 text-sm text-[#6b6b6b] md:mb-4 md:text-base">{HERO.since}</p>
           <h1
-            className={`${headingClass} max-w-4xl text-[clamp(2.5rem,7vw,6.5rem)] leading-[0.95]`}
+            className={`${headingClass} max-w-4xl text-[clamp(2.25rem,7vw,6.5rem)] leading-[0.95]`}
           >
             {HERO.title}
           </h1>
@@ -448,7 +554,7 @@ function Hero() {
         <div
           className="absolute inset-0 flex items-end overflow-hidden bg-black"
           style={{
-            clipPath: `inset(${insetTop}% ${insetSides}% 0% ${insetSides}% round ${radius}px)`,
+            clipPath: `inset(calc(var(--hero-top) * ${open}) calc(var(--hero-side) * ${open}) 0% calc(var(--hero-side) * ${open}) round ${radius}px)`,
           }}
         >
           {/* muted + playsInline are required for autoplay on phones and Chrome */}
@@ -465,7 +571,7 @@ function Hero() {
           <div className="absolute inset-0 bg-black/40" />
 
           <p
-            className={`${headingClass} relative max-w-3xl px-6 pb-16 text-[clamp(1.5rem,3vw,2.75rem)] leading-tight text-white md:px-12 md:pb-20 lg:px-24 xl:px-32`}
+            className={`${headingClass} relative max-w-3xl px-6 pb-12 text-[clamp(1.25rem,3vw,2.75rem)] leading-tight text-white md:px-12 md:pb-20 lg:px-24 xl:px-32`}
             style={{ opacity: introOpacity }}
           >
             {HERO.intro}
@@ -476,23 +582,32 @@ function Hero() {
   );
 }
 
-/** WHO WE ARE (part 1) – words turn dark one by one as you scroll. */
+/**
+ * WHO WE ARE (part 1) – words turn dark one by one as you scroll.
+ * RESPONSIVE: pinned on any screen that is at least 560px tall; on very
+ * short screens (phones turned sideways) it scrolls normally and the words
+ * light up as the paragraph crosses the screen.
+ */
 function WhoWeAreIntro() {
-  const [ref, p] = useScrollProgress<HTMLElement>("pinned");
+  const [ref, p] = useScrollProgress<HTMLElement>("pinned", INTRO_PIN_QUERY);
   const words = WHO.lead.split(" ");
 
   return (
-    <section ref={ref} className="relative h-[170vh]">
-      <PinnedStage sectionRef={ref} className="flex flex-col justify-center pt-20">
+    <section ref={ref} className="pin-intro-section relative">
+      <PinnedStage
+        sectionRef={ref}
+        pinQuery={INTRO_PIN_QUERY}
+        className="pin-intro-stage"
+      >
         <div className="mx-auto w-full max-w-5xl">
           <SectionLabel>{WHO.label}</SectionLabel>
           <h2
-            className={`${headingClass} mb-10 text-[clamp(2rem,4.5vw,4rem)] leading-none`}
+            className={`${headingClass} mb-6 text-[clamp(1.875rem,4.5vw,4rem)] leading-none md:mb-10`}
           >
             {WHO.title}
           </h2>
           <p
-            className={`${headingClass} text-[clamp(1.5rem,3.2vw,2.75rem)] leading-[1.2]`}
+            className={`${headingClass} text-[clamp(1.25rem,3.2vw,2.75rem)] leading-[1.2]`}
           >
             {words.map((word, i) => {
               // Word i "switches on" when progress passes its position.
@@ -518,45 +633,58 @@ function WhoWeAreIntro() {
 }
 
 /**
- * WHO WE ARE (part 2) – this screen stays pinned while the numbers count up.
- * Counting runs from 0% to 60% of the scroll; the last 40% just holds the
- * finished numbers on screen before the page moves on.
+ * WHO WE ARE (part 2) – on big screens this stays pinned while the numbers
+ * count up (counting runs 0% to 60% of the scroll; the last 40% holds the
+ * finished numbers on screen before the page moves on).
+ *
+ * RESPONSIVE: on phones, tablets held upright and short windows the text,
+ * buttons and numbers would not all fit on one screen, so nothing is pinned.
+ * The section scrolls normally and the numbers count up when the numbers
+ * themselves scroll into view.
  */
 function WhoWeAreDetails() {
-  const [ref, p] = useScrollProgress<HTMLElement>("pinned");
-  const count = mapRange(p, 0, 0.6, 0, 1);
+  const [ref, p, pinned] = useScrollProgress<HTMLElement>("pinned", DETAILS_PIN_QUERY);
+  const [statsRef, statsP] = useScrollProgress<HTMLDListElement>("through");
+
+  const count = pinned
+    ? mapRange(p, 0, 0.6, 0, 1)
+    : mapRange(statsP, 0.2, 0.45, 0, 1);
 
   return (
-    <section ref={ref} className="relative h-[190vh]">
+    <section ref={ref} className="pin-details-section relative">
       <PinnedStage
         sectionRef={ref}
-        className="grid content-center gap-10 pt-24 md:grid-cols-12 md:items-center md:gap-14"
+        pinQuery={DETAILS_PIN_QUERY}
+        className="pin-details-stage grid content-center gap-10 md:grid-cols-12 md:items-center md:gap-14"
       >
         <div className="md:col-span-6 md:col-start-1">
           {WHO.paragraphs.map((text) => (
             <p
               key={text}
-              className="mb-5 max-w-xl text-lg leading-relaxed text-[#404040] md:text-xl"
+              className="mb-5 max-w-xl text-base leading-relaxed text-[#404040] md:text-lg lg:text-xl"
             >
               {text}
             </p>
           ))}
-          <div className="mt-8 flex flex-wrap gap-4">
+          <div className="mt-8 flex flex-wrap gap-3 md:gap-4">
             <PrimaryButton href="/contact">Start a Project</PrimaryButton>
             <SecondaryButton href="/services">Our Services</SecondaryButton>
           </div>
         </div>
 
-        <dl className="grid grid-cols-2 gap-8 md:col-span-5 md:col-start-8">
+        <dl
+          ref={statsRef}
+          className="grid grid-cols-2 gap-6 md:col-span-5 md:col-start-8 md:gap-8"
+        >
           {WHO.stats.map((stat) => (
             <div key={stat.label}>
               <dd
-                className={`${headingClass} text-[clamp(3rem,7vw,6rem)] leading-none tabular-nums`}
+                className={`${headingClass} text-[clamp(2.75rem,7vw,6rem)] leading-none tabular-nums`}
               >
                 {Math.round(stat.value * count)}
                 {stat.suffix}
               </dd>
-              <dt className="mt-3 text-base text-[#6b6b6b]">{stat.label}</dt>
+              <dt className="mt-2 text-sm text-[#6b6b6b] md:mt-3 md:text-base">{stat.label}</dt>
             </div>
           ))}
         </dl>
@@ -568,15 +696,15 @@ function WhoWeAreDetails() {
 /** MILESTONES – each number counts up when its row reaches the middle. */
 function Milestones() {
   return (
-    <section className="border-t border-[#e5e5e5] py-24">
-      <div className="mb-20 max-w-2xl">
+    <section className="border-t border-[#e5e5e5] py-16 md:py-24">
+      <div className="mb-12 max-w-2xl md:mb-20">
         <SectionLabel>{MILESTONES.label}</SectionLabel>
         <h2
-          className={`${headingClass} text-[clamp(2.25rem,5vw,4.5rem)] leading-none`}
+          className={`${headingClass} text-[clamp(2rem,5vw,4.5rem)] leading-none`}
         >
           {MILESTONES.title}
         </h2>
-        <p className="mt-6 max-w-md text-lg leading-relaxed text-[#404040]">
+        <p className="mt-5 max-w-md text-base leading-relaxed text-[#404040] md:mt-6 md:text-lg">
           {MILESTONES.intro}
         </p>
       </div>
@@ -587,22 +715,22 @@ function Milestones() {
             {(p) => {
               const count = mapRange(p, 0.3, 0.55, 0, 1);
               return (
-                <div className="grid gap-6 md:grid-cols-12">
+                <div className="grid gap-3 md:grid-cols-12 md:gap-6">
                   {/* Step number: these four really are a numbered list */}
-                  <span className="text-base text-[#6b6b6b] md:col-span-1">
+                  <span className="text-sm text-[#6b6b6b] md:col-span-1 md:text-base">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <p
-                    className={`${headingClass} text-[clamp(3.5rem,8vw,7rem)] leading-none tabular-nums md:col-span-5`}
+                    className={`${headingClass} text-[clamp(3.25rem,8vw,7rem)] leading-none tabular-nums md:col-span-5`}
                   >
                     {Math.round(item.value * count)}
                     {item.suffix}
                   </p>
                   <div className="md:col-span-6">
-                    <h3 className={`${headingClass} text-2xl md:text-3xl`}>
+                    <h3 className={`${headingClass} text-xl md:text-3xl`}>
                       {item.title}
                     </h3>
-                    <p className="mt-3 max-w-md text-lg leading-relaxed text-[#404040]">
+                    <p className="mt-2 max-w-md text-base leading-relaxed text-[#404040] md:mt-3 md:text-lg">
                       {item.text}
                     </p>
                   </div>
@@ -619,12 +747,12 @@ function Milestones() {
 /** FOUNDATION – title stays pinned on the left, list scrolls on the right. */
 function Foundation() {
   return (
-    <section className="grid gap-10 py-24 md:grid-cols-12">
-      {/* StickyBlock keeps the title in view while the list scrolls */}
+    <section className="grid gap-8 py-16 md:grid-cols-12 md:gap-10 md:py-24">
+      {/* StickyBlock keeps the title in view while the list scrolls (desktop only) */}
       <StickyBlock className="md:col-span-5">
         <SectionLabel>{FOUNDATION.label}</SectionLabel>
         <h2
-          className={`${headingClass} text-[clamp(2.25rem,5vw,4.5rem)] leading-none`}
+          className={`${headingClass} text-[clamp(2rem,5vw,4.5rem)] leading-none`}
         >
           {FOUNDATION.title}
         </h2>
@@ -635,10 +763,10 @@ function Foundation() {
           <ScrollRow key={item.title}>
             {() => (
               <>
-                <h3 className={`${headingClass} text-3xl md:text-4xl`}>
+                <h3 className={`${headingClass} text-2xl md:text-4xl`}>
                   {item.title}
                 </h3>
-                <p className="mt-4 max-w-lg text-lg leading-relaxed text-[#404040]">
+                <p className="mt-3 max-w-lg text-base leading-relaxed text-[#404040] md:mt-4 md:text-lg">
                   {item.text}
                 </p>
               </>
@@ -656,6 +784,10 @@ function Foundation() {
  *   1. a black line strikes through the "old way" text,
  *   2. our text fills in from light grey to black, left to right,
  *   3. the dot between them fills in.
+ *
+ * RESPONSIVE: the strike-through is a background line on the text itself
+ * (not a positioned bar), so when the text wraps onto two lines on a phone
+ * the line crosses each line in turn instead of floating between them.
  */
 function SwapRow({ other, ours }: { other: string; ours: string }) {
   const [ref, p] = useScrollProgress<HTMLLIElement>("through");
@@ -664,19 +796,23 @@ function SwapRow({ other, ours }: { other: string; ours: string }) {
   return (
     <li
       ref={ref}
-      className="grid items-center gap-3 border-b border-[#e5e5e5] py-8 md:grid-cols-[1fr_3rem_1fr] md:gap-0 md:py-10"
+      className="grid items-center gap-2 border-b border-[#e5e5e5] py-6 md:grid-cols-[1fr_3rem_1fr] md:gap-0 md:py-10"
     >
       {/* The old way: gets crossed out and fades back */}
       <p
-        className="relative w-fit text-[clamp(1.25rem,2.2vw,1.9rem)] text-[#6b6b6b]"
+        className="text-[clamp(1.125rem,2.2vw,1.9rem)] leading-snug text-[#6b6b6b]"
         style={{ opacity: 1 - t * 0.55 }}
       >
-        {other}
         <span
-          aria-hidden="true"
-          className="absolute left-0 top-1/2 h-[2px] bg-black"
-          style={{ width: `${t * 100}%` }}
-        />
+          style={{
+            backgroundImage: "linear-gradient(#000, #000)",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "0 55%",
+            backgroundSize: `${t * 100}% 2px`,
+          }}
+        >
+          {other}
+        </span>
       </p>
 
       {/* Dot in the middle: empty -> filled */}
@@ -688,7 +824,7 @@ function SwapRow({ other, ours }: { other: string; ours: string }) {
 
       {/* Our way: light grey text, black copy is revealed on top of it */}
       <p
-        className={`${headingClass} relative text-[clamp(1.5rem,3vw,2.5rem)] leading-tight text-[#e5e5e5]`}
+        className={`${headingClass} relative text-[clamp(1.375rem,3vw,2.5rem)] leading-tight text-[#e5e5e5]`}
       >
         {ours}
         <span
@@ -706,24 +842,24 @@ function SwapRow({ other, ours }: { other: string; ours: string }) {
 /** ADVANTAGE – each weak point is crossed out and replaced as you scroll. */
 function Advantage() {
   return (
-    <section className="border-t border-[#e5e5e5] py-24">
-      <div className="mb-16 max-w-2xl">
+    <section className="border-t border-[#e5e5e5] py-16 md:py-24">
+      <div className="mb-12 max-w-2xl md:mb-16">
         <SectionLabel>{ADVANTAGE.label}</SectionLabel>
         <h2
-          className={`${headingClass} text-[clamp(2.25rem,5vw,4.5rem)] leading-none`}
+          className={`${headingClass} text-[clamp(2rem,5vw,4.5rem)] leading-none`}
         >
           {ADVANTAGE.title}
         </h2>
-        <p className="mt-6 max-w-md text-lg leading-relaxed text-[#404040]">
+        <p className="mt-5 max-w-md text-base leading-relaxed text-[#404040] md:mt-6 md:text-lg">
           {ADVANTAGE.intro}
         </p>
       </div>
 
       {/* Column titles */}
       <div className="flex flex-col gap-1 border-b border-black pb-4 md:grid md:grid-cols-[1fr_3rem_1fr] md:gap-0">
-        <h3 className="text-lg text-[#6b6b6b]">{ADVANTAGE.otherTitle}</h3>
+        <h3 className="text-base text-[#6b6b6b] md:text-lg">{ADVANTAGE.otherTitle}</h3>
         <span className="hidden text-center text-base md:block">VS</span>
-        <h3 className={`${headingClass} text-lg`}>{ADVANTAGE.oursTitle}</h3>
+        <h3 className={`${headingClass} text-base md:text-lg`}>{ADVANTAGE.oursTitle}</h3>
       </div>
 
       {/* Row i pairs the i-th "other" item with the i-th "ours" item */}
@@ -736,17 +872,22 @@ function Advantage() {
   );
 }
 
-/** CALL TO ACTION – the black panel grows to full screen width as it enters. */
+/**
+ * CALL TO ACTION – the black panel grows to full screen width as it enters.
+ * RESPONSIVE: the starting side margin scales with the screen
+ * (12px on small phones up to 48px on wide screens).
+ */
 function Cta() {
   const [ref, p] = useScrollProgress<HTMLElement>("through");
 
-  const sideMargin = mapRange(p, 0.35, 0.75, 48, 0); // px
+  const grow = mapRange(p, 0.35, 0.75, 1, 0); // 1 = inset panel, 0 = full width
   const radius = mapRange(p, 0.35, 0.75, 28, 0); // px
+  const sideMargin = `calc(clamp(12px, 4vw, 48px) * ${grow})`;
 
   return (
-    <section ref={ref} className="-mx-6 pt-24 md:-mx-12 lg:-mx-24 xl:-mx-32">
+    <section ref={ref} className="-mx-6 pt-16 md:-mx-12 md:pt-24 lg:-mx-24 xl:-mx-32">
       <div
-        className="bg-[#000000] px-6 py-28 text-[#ffffff] md:px-12 lg:px-24 xl:px-32"
+        className="bg-[#000000] px-6 py-20 text-[#ffffff] md:px-12 md:py-28 lg:px-24 xl:px-32"
         style={{
           marginLeft: sideMargin,
           marginRight: sideMargin,
@@ -756,12 +897,12 @@ function Cta() {
       >
         <SectionLabel light>{CTA.label}</SectionLabel>
         <h2
-          className={`${headingClass} max-w-3xl text-[clamp(2.5rem,6vw,5.5rem)] leading-none`}
+          className={`${headingClass} max-w-3xl text-[clamp(2.25rem,6vw,5.5rem)] leading-none`}
         >
           {CTA.title}
         </h2>
-        <p className="mt-6 max-w-md text-lg text-[#a3a3a3]">{CTA.text}</p>
-        <div className="mt-10 flex flex-wrap gap-4">
+        <p className="mt-5 max-w-md text-base text-[#a3a3a3] md:mt-6 md:text-lg">{CTA.text}</p>
+        <div className="mt-8 flex flex-wrap gap-3 md:mt-10 md:gap-4">
           <PrimaryButton href="/contact" onDark>
             Get In Touch
           </PrimaryButton>
@@ -780,8 +921,12 @@ function Cta() {
 
 export default function AboutPage() {
   // Side margins for the whole page live on <main>, nowhere else.
+  // overflow-x-clip stops the full-width hero / CTA from ever causing a
+  // sideways scrollbar on phones (unlike overflow-hidden, it does not
+  // create a scroll container).
   return (
-    <main className="bg-white px-6 text-black md:px-12 lg:px-24 xl:px-32">
+    <main className="overflow-x-clip bg-white px-6 text-black md:px-12 lg:px-24 xl:px-32">
+      <style>{PIN_CSS}</style>
       <SmoothScroll />
       <Hero />
       <WhoWeAreIntro />
