@@ -4,6 +4,10 @@
  * Next.js 16 (App Router) · React 19 · Tailwind CSS v3.4+ / v4. No extra dependencies.
  * Matches the Services page: same palette, easing, radii, rolling titles and active-dot pattern.
  *
+ * LOGO
+ *  - Put your logo file in  public/logo.svg  (SVG is best; a transparent PNG also works).
+ *  - Change the file name, alt text or colour mode in the LOGO object in section 3 below.
+ *
  * COLOUR FOLLOWING
  *  - The header reads the real background + text colour of whatever sits behind it and copies them
  *    into --nav-bg / --nav-fg. Logo, links, icons, hamburger and the Services dropdown all use
@@ -126,6 +130,49 @@ function detectTone(header: HTMLElement | null): Tone | null {
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 const INK = "text-[color:var(--nav-fg)]";
 const SOFT = "text-[color:color-mix(in_srgb,var(--nav-fg)_62%,transparent)] hover:text-[color:var(--nav-fg)]";
+
+/**
+ * LOGO – edit these three values to change the logo.
+ *  src:     the file inside the /public folder
+ *  alt:     text for screen readers
+ *  recolor: true  -> the logo takes the navbar's current text colour (white on dark sections,
+ *                    black on light ones). Best for one-colour logos.
+ *           false -> the logo keeps its own original colours.
+ */
+const LOGO = { src: "images/logo.png", alt: "Empire AE", recolor: true };
+
+function Logo() {
+  // Height of the logo. The width follows automatically from the logo's shape.
+const size = "h-15 w-auto sm:h-16 lg:h-17";
+  if (!LOGO.recolor) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={LOGO.src} alt={LOGO.alt} className={`block ${size}`} />;
+  }
+
+  return (
+    <span className="relative inline-block">
+      {/* Invisible copy of the logo: it only gives the box its size (and the alt text). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={LOGO.src} alt={LOGO.alt} className={`block opacity-0 ${size}`} />
+
+      {/* Same logo used as a stencil, filled with the current text colour. */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 bg-current"
+        style={{
+          WebkitMaskImage: `url(${LOGO.src})`,
+          maskImage: `url(${LOGO.src})`,
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskPosition: "left center",
+          maskPosition: "left center",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+        }}
+      />
+    </span>
+  );
+}
 
 const Icon = ({ d, className = "size-5", sw = 1.8 }: { d: string; className?: string; sw?: number }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -339,8 +386,9 @@ export default function Navbar() {
         ].join(" ")}
       >
         <div className={`mx-auto flex h-[72px] max-w-[1440px] items-center gap-8 px-5 transition-colors duration-200 sm:px-8 lg:h-[84px] lg:px-14 ${INK}`}>
-          <Link href="/" aria-label="Empire AE home" className={`flex items-center gap-2.5 text-[1.7rem] font-semibold tracking-tight ${INK}`}>
-            empire
+          {/* Logo (replaces the old "empire" text) */}
+          <Link href="/" aria-label="Empire AE home" className={`flex items-center ${INK}`}>
+            <Logo />
           </Link>
 
           <nav aria-label="Primary" className="mx-auto hidden lg:block">
@@ -379,7 +427,6 @@ export default function Navbar() {
             <button type="button" aria-label="Saved" className={`${iconBtn} hidden xl:grid`}>
               <Icon d="M6 3h12v18l-6-4-6 4Z" className="size-[22px]" />
             </button>
-
 
             <button ref={burger} type="button" onClick={openMenu} aria-label="Open menu" aria-haspopup="dialog" className={`group ml-1.5 grid size-12 place-content-center rounded-full ${INK}`}>
               <span className="block h-0.5 w-[30px] rounded bg-current" />
@@ -489,8 +536,9 @@ export default function Navbar() {
         {/* top row */}
         <div className="relative z-10 shrink-0 pt-[env(safe-area-inset-top)]">
           <div className="flex h-[72px] items-center justify-between px-6 sm:px-10 lg:h-[84px]">
-            <Link href="/" onClick={closeMenu} className="text-[1.7rem] font-semibold tracking-tight">
-              empire
+            {/* Logo in the menu: takes the menu's text colour, which changes per item */}
+            <Link href="/" onClick={closeMenu} aria-label="Empire AE home" className="flex items-center">
+              <Logo />
             </Link>
             <button
               ref={closeBtn}
