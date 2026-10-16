@@ -8,6 +8,11 @@
  *  - Put your logo file in  public/logo.svg  (SVG is best; a transparent PNG also works).
  *  - Change the file name, alt text or colour mode in the LOGO object in section 3 below.
  *
+ * WHATSAPP
+ *  - The phone icon in the header opens a WhatsApp chat.
+ *  - Change the number and the pre-filled message in the WHATSAPP object in section 1 below.
+ *    Number = country code + number, digits only (no "+", spaces or dashes). Example: 919999999999
+ *
  * COLOUR FOLLOWING
  *  - The header reads the real background + text colour of whatever sits behind it and copies them
  *    into --nav-bg / --nav-fg. Logo, links, icons, hamburger and the Services dropdown all use
@@ -45,6 +50,14 @@ const LINKS = [
   { label: "Careers", href: "/careers" },
   { label: "Contact", href: "/contact" },
 ];
+
+/**
+ * WHATSAPP – the phone icon in the header opens this chat.
+ *  number:  country code + number, digits only (no "+", spaces or dashes)
+ *  message: text that is pre-filled in the chat box (the visitor can edit it)
+ */
+const WHATSAPP = { number: "919999999999", message: "Hi Empire AE, I'd like to discuss a project." };
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP.number}?text=${encodeURIComponent(WHATSAPP.message)}`;
 
 type MenuItem = { key: string; text: string; cta: string; href: string; bg: string; fg: string; accent: string; stats?: [string, string][] };
 const MENU: MenuItem[] = [
@@ -417,14 +430,12 @@ export default function Navbar() {
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
-            <a href="tel:+0000000000" aria-label="Call us" className={`${iconBtn} hidden xl:grid`}>
+            {/* Phone icon -> opens a WhatsApp chat in a new tab (number + message set in WHATSAPP above) */}
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className={`${iconBtn} hidden xl:grid`}>
               <Icon d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" className="size-[22px]" sw={1.6} />
             </a>
             <button type="button" aria-label="Search" className={iconBtn}>
               <Icon d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4" className="size-[22px]" />
-            </button>
-            <button type="button" aria-label="Saved" className={`${iconBtn} hidden xl:grid`}>
-              <Icon d="M6 3h12v18l-6-4-6 4Z" className="size-[22px]" />
             </button>
 
             <button ref={burger} type="button" onClick={openMenu} aria-label="Open menu" aria-haspopup="dialog" className={`group ml-1.5 grid size-12 place-content-center rounded-full ${INK}`}>
