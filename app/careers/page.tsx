@@ -98,24 +98,28 @@ const BALANCE = [
 
 const LIFE = [
   {
-    src: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&w=1000&q=85",
-    cap: "Planning sessions",
+    src: "/images/life-1.jpeg",
+    cap: "Success",
   },
   {
-    src: "https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=1000&q=85",
-    cap: "Team lunch",
+    src: "/images/life-2.jpeg",
+    cap: "Celebrations",
   },
   {
-    src: "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1000&q=85",
-    cap: "Workshops",
+    src: "/images/life-3.jpeg",
+    cap: "Games",
   },
   {
-    src: "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1000&q=85",
-    cap: "Events and offsites",
+    src: "/images/life-4.jpeg",
+    cap: "Champions",
   },
   {
-    src: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=1000&q=85",
-    cap: "Client launches",
+    src: "/images/life-5.jpeg",
+    cap: "Onam",
+  },
+   {
+    src: "/images/life-6.jpeg",
+    cap: "Onam-2",
   },
 ];
 
@@ -776,15 +780,7 @@ export default function Careers() {
               what your first years can look like.
             </p>
 
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
-                "Career enquiry"
-              )}`}
-              className="mt-8 inline-flex items-center gap-2 text-sm text-[#7b7d7d] transition-colors hover:text-white"
-            >
-              Let&apos;s talk about your future
-              <ArrowUpRight size={17} />
-            </a>
+          
           </div>
 
           <div data-path className="relative pl-10 sm:pl-14">
@@ -828,7 +824,7 @@ export default function Careers() {
           4. WORK-LIFE BALANCE
       =================================================== */}
 
-      <section className="rounded-t-[2rem] bg-white px-5 py-24 text-black sm:rounded-t-[3rem] sm:px-10 lg:px-[8%] lg:py-32">
+      {/* <section className="rounded-t-[2rem] bg-white px-5 py-24 text-black sm:rounded-t-[3rem] sm:px-10 lg:px-[8%] lg:py-32">
         <div className="mx-auto max-w-[88rem]">
           <p className="mb-5 text-xs uppercase tracking-[0.25em] text-black/45">
             Work well. Live well.
@@ -862,7 +858,8 @@ export default function Careers() {
             ))}
           </dl>
         </div>
-      </section>
+      </section> */}
+      
 
       {/* ===================================================
           5. LIFE AT EMPIRE AE
