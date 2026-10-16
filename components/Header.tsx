@@ -4,6 +4,10 @@
  * Next.js 16 (App Router) · React 19 · Tailwind CSS v3.4+ / v4. No extra dependencies.
  * Matches the Services page: same palette, easing, radii, rolling titles and active-dot pattern.
  *
+ * LOGO
+ *  - Put your logo file in  public/logo.svg  (SVG is best; a transparent PNG also works).
+ *  - Change the file name, alt text or colour mode in the LOGO object in section 3 below.
+ *
  * COLOUR FOLLOWING
  *  - The header reads the real background + text colour of whatever sits behind it and copies them
  *    into --nav-bg / --nav-fg. Logo, links, icons, hamburger and the Services dropdown all use
@@ -35,8 +39,7 @@ const SERVICES: Service[] = [
 ];
 
 const LINKS = [
-  { label: "Solutions", href: "/solutions" },
-  { label: "Our Team", href: "/industries" },
+  { label: "Our Team", href: "/team" },
   { label: "Works", href: "/works" },
   { label: "About", href: "/about" },
   { label: "Careers", href: "/careers" },
@@ -126,6 +129,49 @@ function detectTone(header: HTMLElement | null): Tone | null {
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 const INK = "text-[color:var(--nav-fg)]";
 const SOFT = "text-[color:color-mix(in_srgb,var(--nav-fg)_62%,transparent)] hover:text-[color:var(--nav-fg)]";
+
+/**
+ * LOGO – edit these three values to change the logo.
+ *  src:     the file inside the /public folder
+ *  alt:     text for screen readers
+ *  recolor: true  -> the logo takes the navbar's current text colour (white on dark sections,
+ *                    black on light ones). Best for one-colour logos.
+ *           false -> the logo keeps its own original colours.
+ */
+const LOGO = { src: "/images/logo.png", alt: "Empire AE", recolor: true };
+
+function Logo() {
+  // Height of the logo. The width follows automatically from the logo's shape.
+const size = "h-15 w-auto sm:h-16 lg:h-17";
+  if (!LOGO.recolor) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={LOGO.src} alt={LOGO.alt} className={`block ${size}`} />;
+  }
+
+  return (
+    <span className="relative inline-block">
+      {/* Invisible copy of the logo: it only gives the box its size (and the alt text). */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={LOGO.src} alt={LOGO.alt} className={`block opacity-0 ${size}`} />
+
+      {/* Same logo used as a stencil, filled with the current text colour. */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 bg-current"
+        style={{
+          WebkitMaskImage: `url(${LOGO.src})`,
+          maskImage: `url(${LOGO.src})`,
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskPosition: "left center",
+          maskPosition: "left center",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+        }}
+      />
+    </span>
+  );
+}
 
 const Icon = ({ d, className = "size-5", sw = 1.8 }: { d: string; className?: string; sw?: number }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -339,8 +385,9 @@ export default function Navbar() {
         ].join(" ")}
       >
         <div className={`mx-auto flex h-[72px] max-w-[1440px] items-center gap-8 px-5 transition-colors duration-200 sm:px-8 lg:h-[84px] lg:px-14 ${INK}`}>
-          <Link href="/" aria-label="Empire AE home" className={`flex items-center gap-2.5 text-[1.7rem] font-semibold tracking-tight ${INK}`}>
-            empire
+          {/* Logo (replaces the old "empire" text) */}
+          <Link href="/" aria-label="Empire AE home" className={`flex items-center ${INK}`}>
+            <Logo />
           </Link>
 
           <nav aria-label="Primary" className="mx-auto hidden lg:block">
@@ -379,7 +426,6 @@ export default function Navbar() {
             <button type="button" aria-label="Saved" className={`${iconBtn} hidden xl:grid`}>
               <Icon d="M6 3h12v18l-6-4-6 4Z" className="size-[22px]" />
             </button>
-
 
             <button ref={burger} type="button" onClick={openMenu} aria-label="Open menu" aria-haspopup="dialog" className={`group ml-1.5 grid size-12 place-content-center rounded-full ${INK}`}>
               <span className="block h-0.5 w-[30px] rounded bg-current" />
@@ -452,8 +498,17 @@ export default function Navbar() {
       {/* click-away scrim */}
       <div data-nav-ignore onClick={() => setMegaOpen(false)} className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${megaOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      {/* ============ Full-screen right menu (palette changes per item, like the Services section) ============ */}
+      {/* ============ Right-side half-page menu (palette changes per item, like the Services section) ============ */}
+      {/* dim + blur backdrop, click to close */}
       <div
+        data-nav-ignore
+        onClick={closeMenu}
+        aria-hidden="true"
+        className={`fixed inset-0 z-[99] bg-black/45 backdrop-blur-[3px] transition-opacity duration-500 ${menuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      />
+
+      {/* panel: full width on phones, 75% small tablets, 60% tablets, half the screen on desktop */}
+      <aside
         data-nav-ignore
         data-lenis-prevent
         role="dialog"
@@ -461,10 +516,10 @@ export default function Navbar() {
         aria-label="Site menu"
         style={{ "--m-bg": cur.bg, "--m-fg": cur.fg } as CSSProperties}
         className={[
-          "fixed inset-0 z-[100] overflow-y-auto bg-[var(--m-bg)] text-[color:var(--m-fg)]",
+          "fixed inset-y-0 right-0 z-[100] flex w-full max-w-[960px] flex-col overflow-hidden bg-[var(--m-bg)] text-[color:var(--m-fg)] shadow-[-40px_0_90px_-30px_rgba(0,0,0,0.5)] sm:w-[75vw] md:w-[60vw] lg:w-1/2 sm:rounded-l-[1.4rem]",
           menuOpen
-            ? "visible [clip-path:circle(150%_at_calc(100%_-_56px)_52px)] [transition:clip-path_850ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s]"
-            : "invisible [clip-path:circle(0_at_calc(100%_-_56px)_52px)] [transition:clip-path_850ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s_linear_850ms]",
+            ? "visible translate-x-0 [transition:transform_700ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s]"
+            : "invisible translate-x-full [transition:transform_600ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s_linear_600ms]",
         ].join(" ")}
       >
         {/* soft shade that cross-fades with each item */}
@@ -472,52 +527,76 @@ export default function Navbar() {
           <div
             key={m.key}
             aria-hidden="true"
-            className={`pointer-events-none fixed inset-0 transition-opacity duration-1000 ${active === i ? "opacity-100" : "opacity-0"}`}
-            style={{ background: `radial-gradient(120% 90% at 85% 100%, color-mix(in srgb, ${m.accent} 28%, transparent), transparent 60%)` }}
+            className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${active === i ? "opacity-100" : "opacity-0"}`}
+            style={{ background: `radial-gradient(120% 70% at 90% 100%, color-mix(in srgb, ${m.accent} 28%, transparent), transparent 62%)` }}
           />
         ))}
 
         {/* top row */}
-        <div className="sticky top-0 z-10 bg-[color-mix(in_srgb,var(--m-bg)_70%,transparent)] pt-[env(safe-area-inset-top)] backdrop-blur-md">
-          <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:h-[84px] lg:px-14">
-            <Link href="/" onClick={closeMenu} className="flex items-center gap-2.5 text-[1.7rem] font-semibold tracking-tight">
-              empire
+        <div className="relative z-10 shrink-0 pt-[env(safe-area-inset-top)]">
+          <div className="flex h-[72px] items-center justify-between px-6 sm:px-10 lg:h-[84px]">
+            {/* Logo in the menu: takes the menu's text colour, which changes per item */}
+            <Link href="/" onClick={closeMenu} aria-label="Empire AE home" className="flex items-center">
+              <Logo />
             </Link>
             <button
               ref={closeBtn}
               type="button"
               onClick={closeMenu}
               aria-label="Close menu"
-              className="grid size-[52px] place-items-center rounded-full bg-[color-mix(in_srgb,currentColor_14%,transparent)] outline-none transition-[transform,background-color] duration-500 hover:rotate-90 hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)] focus-visible:ring-2 focus-visible:ring-current"
+              className="grid size-12 place-items-center rounded-full bg-[color-mix(in_srgb,currentColor_14%,transparent)] outline-none transition-[transform,background-color] duration-500 hover:rotate-90 hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)] focus-visible:ring-2 focus-visible:ring-current"
             >
               <Icon d="M5 5l14 14M19 5 5 19" className="size-[22px]" />
             </button>
           </div>
         </div>
 
-        <div className="relative mx-auto grid max-w-[1440px] gap-10 px-5 pb-16 pt-6 sm:px-8 lg:grid-cols-[1.4fr_1fr] lg:gap-16 lg:px-14 lg:pt-14">
-          {/* left: content panes */}
-          <div className="order-2 grid lg:order-1">
+        {/* link list – fixed in place, never scrolls away */}
+        <ul className="relative z-10 flex shrink-0 flex-col gap-px px-6 pt-2 sm:px-10">
+          {MENU.map((m, i) => (
+            <li
+              key={m.key}
+              className={`transition-[opacity,transform] duration-700 ${EASE} ${menuOpen ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
+              style={{ transitionDelay: menuOpen ? `${250 + i * 60}ms` : "0ms" }}
+            >
+              <button
+                type="button"
+                aria-current={active === i}
+                onClick={() => setActive(i)}
+                onFocus={() => setActive(i)}
+                onPointerEnter={(e) => e.pointerType === "mouse" && setActive(i)}
+                className={`block w-full py-1 text-left text-[clamp(1.15rem,0.9rem+0.8vw,1.55rem)] font-medium leading-[1.2] tracking-tight outline-none transition-opacity duration-500 ${active === i ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
+              >
+                {m.key}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/* details for the selected item – own scroll area, shown in full */}
+        <div data-lenis-prevent className="relative mt-5 min-h-0 flex-1 overflow-y-auto border-t border-[color-mix(in_srgb,currentColor_16%,transparent)] px-6 pb-10 pt-6 sm:px-10">
+          <div className="grid">
             {MENU.map((m, i) => (
-              <section key={m.key} aria-hidden={active !== i} className={`col-start-1 row-start-1 transition-[opacity,transform] duration-[600ms] ${EASE} ${active === i ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3.5 opacity-0"}`}>
-                <h2 className="mb-7 text-[clamp(2rem,1rem+3.6vw,4.25rem)] font-semibold leading-[0.95] tracking-tight">{m.key === "Impact" ? "Our Impact" : m.key}</h2>
-                <p className="mb-12 max-w-[44ch] text-[clamp(1rem,0.9rem+0.35vw,1.15rem)] leading-relaxed opacity-75">{m.text}</p>
+              <section key={m.key} aria-hidden={active !== i} className={`col-start-1 row-start-1 transition-[opacity,transform] duration-[600ms] ${EASE} ${active === i ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
+                <h2 className="mb-3 text-[clamp(1.5rem,1rem+1.4vw,2.2rem)] font-semibold leading-tight tracking-tight">{m.key === "Impact" ? "Our Impact" : m.key}</h2>
+                <p className="mb-6 max-w-[46ch] text-[clamp(0.95rem,0.88rem+0.3vw,1.1rem)] leading-relaxed opacity-75">{m.text}</p>
                 {m.stats && (
-                  <div className="mb-12 flex flex-wrap gap-x-14 gap-y-8">
+                  <div className="mb-6 grid grid-cols-3 gap-4 sm:gap-6">
                     {m.stats.map(([n, label]) => (
                       <div key={n}>
-                        <b className="mb-3 block text-[clamp(1.75rem,1rem+2.2vw,2.9rem)] font-light leading-none tracking-tight">
+                        <b className="mb-2 block text-[clamp(1.5rem,1rem+1.5vw,2.25rem)] font-light leading-none tracking-tight">
                           <CountUp value={n} run={menuOpen && active === i} />
                         </b>
-                        <span className="block max-w-[20ch] text-base leading-snug opacity-70">{label}</span>
+                        <span className="block text-[0.8rem] leading-snug opacity-70 sm:text-sm">{label}</span>
                       </div>
                     ))}
                   </div>
                 )}
                 <Link
                   href={m.href}
+                  onClick={closeMenu}
                   tabIndex={active === i ? 0 : -1}
-                  className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-[var(--m-fg)] px-6 py-3 text-base font-medium outline-none transition-opacity duration-300 hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--m-fg)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--m-bg)]"
+                  className="group inline-flex min-h-11 items-center gap-3 rounded-full bg-[var(--m-fg)] px-5 py-2.5 text-[0.95rem] font-medium outline-none transition-opacity duration-300 hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--m-fg)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--m-bg)]"
                 >
                   <span className="inline-flex items-center gap-3 text-[color:var(--m-bg)]">
                     <span aria-hidden="true" className="size-2 rounded-full bg-current" />
@@ -529,39 +608,16 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* right: link list */}
-          <div className="order-1 lg:order-2">
-            <ul className="flex flex-col gap-1">
-              {MENU.map((m, i) => (
-                <li
-                  key={m.key}
-                  className={`transition-[opacity,transform] duration-700 ${EASE} ${menuOpen ? "translate-x-0 opacity-100" : "translate-x-10 opacity-0"}`}
-                  style={{ transitionDelay: menuOpen ? `${350 + i * 70}ms` : "0ms" }}
-                >
-                  <Link
-                    href={m.href}
-                    onClick={closeMenu}
-                    onMouseEnter={() => setActive(i)}
-                    onFocus={() => setActive(i)}
-                    className={`block py-1 text-[clamp(1.5rem,0.9rem+2.4vw,2.75rem)] font-medium leading-[1.15] tracking-tight outline-none transition-opacity duration-500 ${active === i ? "opacity-100" : "opacity-40"}`}
-                  >
-                    {m.key}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            {/* primary pages, for screens where the top links are hidden */}
-            <div className="mt-10 flex flex-wrap gap-2 lg:hidden">
-              {[{ label: "Services", href: "/services" }, ...LINKS].map((l) => (
-                <Link key={l.href} href={l.href} onClick={closeMenu} className="rounded-full border border-[color-mix(in_srgb,currentColor_28%,transparent)] px-4 py-2 text-sm font-medium">
-                  {l.label}
-                </Link>
-              ))}
-            </div>
+          {/* primary pages, for screens where the top links are hidden */}
+          <div className="mt-8 flex flex-wrap gap-2 lg:hidden">
+            {[{ label: "Services", href: "/services" }, ...LINKS].map((l) => (
+              <Link key={l.href} href={l.href} onClick={closeMenu} className="rounded-full border border-[color-mix(in_srgb,currentColor_28%,transparent)] px-4 py-2 text-sm font-medium">
+                {l.label}
+              </Link>
+            ))}
           </div>
         </div>
-      </div>
+      </aside>
     </>
   );
 }

@@ -9,7 +9,7 @@
  *   3. Brand showcase (black -> white) + Client reviews (scroll-controlled, mouse reveal)
  *   4. Words showcase (Vision / Expertise / Success, pinned, zoom-through tunnel)
  *   5. Services (concave scroll layout)
- *   6. Projects (pinned circular wheel)  +  Contact info
+ *   6. Projects (pinned circular wheel, fully responsive)  +  Contact info
  *
  * Requires:  npm install gsap lenis lucide-react
  * Save as:   app/page.tsx
@@ -1942,7 +1942,8 @@ function ServicesSection({
         return () => cleanups.forEach((fn) => fn());
       }
     );
-let cancelled = false;
+
+    let cancelled = false;
     document.fonts?.ready.then(() => {
       if (!cancelled) ScrollTrigger.refresh();
     });
@@ -2010,87 +2011,39 @@ let cancelled = false;
 /* =====================================================================
    5. PROJECTS (circular wheel) + CONTACT INFO
    ===================================================================== */
-type Category = "Web Design" | "Mobile Apps" | "Marketing" | "Branding";
-
-const filters = ["All Projects", "Web Design", "Mobile Apps", "Marketing", "Branding"] as const;
+const filters = ["All Projects", "Web Development", "Mobile App", "Digital Marketing"] as const;
+type Filter = (typeof filters)[number];
+type Category = Exclude<Filter, "All Projects">;
 
 const projects: {
   title: string;
   tag: string;
   category: Category;
-  year: string;
   text: string;
   overlay: string;
   image: string;
 }[] = [
-  {
-    title: "E-Commerce Platform",
-    overlay: "Full-featured online store with advanced filtering, secure payments, and a mobile-first checkout experience.",
-    tag: "Web Development",
-    category: "Web Design",
-    year: "2025",
-    text: "Custom-built WooCommerce store with advanced product filtering, secure payment gateway integration, and mobile-first design.",
-    image: "https://tse4.mm.bing.net/th/id/OIP.kPURjF7-ZvO6mSVpmp95GwHaD8?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
-  },
-  {
-    title: "Facebook Ad Campaign",
-    overlay: "Multi-channel Facebook campaign that generated 300% ROI and 2x lead generation for a retail brand.",
-    tag: "Digital Marketing",
-    category: "Marketing",
-    year: "2025",
-    text: "Data-driven social media campaign delivering 300% ROI, reaching 500K+ targeted users with optimized ad creatives.",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Social Media Brand Kit",
-    overlay: "Complete social media brand identity including logo, templates, color system, and content strategy.",
-    tag: "Branding",
-    category: "Branding",
-    year: "2024",
-    text: "Full brand identity system with custom logo design, visual language, and pre-built social media content templates.",
-    image: "https://masterbundles.com/wp-content/uploads/2023/05/01--330.jpg",
-  },
-  {
-    title: "Business Management App",
-    overlay: "Cross-platform mobile app with real-time data sync, offline capability, and intuitive dashboard interface.",
-    tag: "Mobile App",
-    category: "Mobile Apps",
-    year: "2025",
-    text: "Flutter-based cross-platform app serving 1,000+ daily active users with real-time analytics, push notifications, and offline data sync.",
-    image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Corporate Website Redesign",
-    overlay: "Complete website overhaul resulting in 180% increase in organic traffic and 40% better conversion rate.",
-    tag: "Web Design",
-    category: "Web Design",
-    year: "2024",
-    text: "Complete redesign with modern UI, optimized page speed (99 Lighthouse score), and SEO-first architecture.",
-    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Organic SEO Campaign",
-    overlay: "6-month SEO strategy that pushed 50+ keywords to Page 1 and tripled organic traffic.",
-    tag: "SEO",
-    category: "Marketing",
-    year: "2024",
-    text: "Comprehensive SEO overhaul pushing 50+ target keywords to Page 1 of Google — 3x organic traffic growth in 6 months.",
-    image: "https://images.unsplash.com/photo-1432888622747-4eb9a8efeb07?auto=format&fit=crop&w=900&q=80",
-  },
+  { title: "Nakshathra HRMS", overlay: "Nakshathra", tag: "Mobile App", category: "Mobile App", text: "", image: "/Mobile App Logo/Nakshathra Hrms.jpeg" },
+  { title: "Miorah", overlay: "Jewellery", tag: "Web Development", category: "Web Development", text: "Jewellery", image: "/Web Logo/Miorah.jpeg" },
+  { title: "YDU", overlay: "", tag: "Digital Marketing", category: "Digital Marketing", text: "", image: "/Dm Logo/YDU.jpeg" },
+  { title: "Gabby talk", overlay: "", tag: "Mobile App", category: "Mobile App", text: "", image: "/Mobile App Logo/gabby talk.jpeg" },
+  { title: "Charmika", overlay: "Jewellery", tag: "Web Development", category: "Web Development", text: "Jewellery", image: "/Web Logo/Charmika.jpeg" },
+  { title: "Le & Lee", overlay: "", tag: "Digital Marketing", category: "Digital Marketing", text: "", image: "/Dm Logo/le & lee.png" },
 ];
 
 /* ---- Circular project wheel: pinned, scroll rotates the projects around a big ring ---- */
 function ProjectsWheel() {
-  const [filter, setFilter] = useState<(typeof filters)[number]>("All Projects");
+  const [filter, setFilter] = useState<Filter>("All Projects");
   const [idx, setIdx] = useState(0);
   const rootRef = useRef<HTMLElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null); // filters + project text (measured)
+  const counterRef = useRef<HTMLDivElement>(null); // bottom counter bar (measured)
   const stRef = useRef<ScrollTrigger | null>(null);
 
   const visible = filter === "All Projects" ? projects : projects.filter((p) => p.category === filter);
-  const countFor = (f: (typeof filters)[number]) =>
-    f === "All Projects" ? projects.length : projects.filter((p) => p.category === f).length;
+  const countFor = (f: Filter) => (f === "All Projects" ? projects.length : projects.filter((p) => p.category === f).length);
   const safeIdx = Math.min(idx, visible.length - 1);
   const active = visible[safeIdx];
 
@@ -2104,21 +2057,42 @@ function ProjectsWheel() {
     if (!n) return;
 
     const DEG = 180 / Math.PI;
-    const proxy = { v: 0 }; // fractional index of the card at the top of the wheel
-    let R = 600; // ring radius (px)
-    let step = 0.3; // angle between neighbouring cards (rad)
+    const SCALE = 1.06; // scale of the front card
+    const ASPECT = 10 / 16; // card height / width
+    const proxy = { v: 0 };
+    let R = 600;
+    let step = 0.3;
     let shown = -1;
 
-    // Sizes depend on the screen, so everything is measured, never hard-coded.
+    /* Everything is derived from the real screen + the real text height, so the
+       wheel fits phones, tablets, laptops and landscape phones alike. */
     const measure = () => {
       const W = root.clientWidth;
       const H = root.clientHeight;
-      const cw = cards[0].offsetWidth || 300;
-      const cardY = Math.round(H * (W < 480 ? 0.72 : W < 768 ? 0.70 : 0.70));
-      // Keep the wheel proportional on phones instead of forcing a 520px radius.
-      R = Math.max(W * (W < 480 ? 0.72 : W < 768 ? 0.78 : 0.85), W < 480 ? 260 : W < 768 ? 360 : 520);
-      step = (cw * (W < 480 ? 1.08 : 1.16)) / R;
-      gsap.set(cards, { top: cardY, xPercent: -50, yPercent: -50 });
+      const phone = W < 640;
+      const tablet = W >= 640 && W < 1024;
+
+      // 1. Vertical space between the text block and the counter bar
+      const info = infoRef.current;
+      const counter = counterRef.current;
+      const wrap = info?.offsetParent as HTMLElement | null;
+      const top = info ? (wrap?.offsetTop ?? 0) + info.offsetTop + info.offsetHeight + 16 : H * 0.4;
+      const bottom = counter ? counter.offsetTop - 16 : H - 48;
+      const avail = Math.max(bottom - top, 120);
+
+      // 2. Card width: by screen width, then shrunk if it would not fit the height
+      const base = phone ? clamp(W * 0.66, 180, 320) : tablet ? clamp(W * 0.4, 260, 380) : clamp(W * 0.26, 300, 440);
+      const cw = Math.max(120, Math.min(base, avail / (SCALE * ASPECT)));
+      const cardY = Math.round(top + avail / 2);
+
+      // 3. Ring radius from the spacing between cards (phones: tighter + gentler curve
+      //    so the neighbouring cards peek in from the sides)
+      const spacing = cw * (phone ? 0.8 : tablet ? 1.05 : 1.16);
+      const targetStep = phone ? 0.5 : tablet ? 0.42 : 0.36; // radians between cards
+      R = Math.max(spacing / targetStep, 240);
+      step = spacing / R;
+
+      gsap.set(cards, { top: cardY, width: cw, xPercent: -50, yPercent: -50 });
       Object.assign(ring.style, {
         width: `${R * 2}px`,
         height: `${R * 2}px`,
@@ -2127,7 +2101,6 @@ function ProjectsWheel() {
       });
     };
 
-    // Put every card on the circle for the current rotation.
     const render = () => {
       const v = proxy.v;
       cards.forEach((el, i) => {
@@ -2138,7 +2111,7 @@ function ProjectsWheel() {
           x: R * Math.sin(a),
           y: R * (1 - Math.cos(a)),
           rotation: a * DEG,
-          scale: 1.06 - Math.min(ad, 2) * 0.15,
+          scale: SCALE - Math.min(ad, 2) * 0.15,
           autoAlpha: ad > 3 ? 0 : Math.max(0.18, 1 - ad * 0.32),
           zIndex: Math.round(20 - ad * 3),
         });
@@ -2157,7 +2130,7 @@ function ProjectsWheel() {
       render();
 
       if (n > 1) {
-        const H0 = 0.2; // short hold before and after the rotation
+        const H0 = 0.2;
         const tl = gsap.timeline({
           defaults: { ease: "none" },
           scrollTrigger: {
@@ -2177,11 +2150,14 @@ function ProjectsWheel() {
       }
     }, root);
 
+    // Re-measure whenever the section OR the text block changes size
+    // (rotation, resize, font load, longer title / description).
     const ro = new ResizeObserver(() => {
       measure();
       render();
     });
     ro.observe(root);
+    if (infoRef.current) ro.observe(infoRef.current);
 
     let cancelled = false;
     document.fonts?.ready.then(() => {
@@ -2199,7 +2175,6 @@ function ProjectsWheel() {
     };
   }, [filter]);
 
-  /* Jump the wheel to card i by scrolling to its position inside the pinned range. */
   const goTo = (i: number) => {
     const st = stRef.current;
     if (!st || i === safeIdx) return;
@@ -2210,11 +2185,10 @@ function ProjectsWheel() {
     else window.scrollTo({ top: y, behavior: "smooth" });
   };
 
-  const pick = (f: (typeof filters)[number]) => {
+  const pick = (f: Filter) => {
     if (f === filter) return;
     const st = stRef.current;
     if (st) {
-      // go back to the start of the pinned range so the new (shorter/longer) wheel starts at card 1
       if (lenisInstance) lenisInstance.scrollTo(st.start, { immediate: true });
       else window.scrollTo(0, st.start);
     }
@@ -2223,14 +2197,13 @@ function ProjectsWheel() {
   };
 
   return (
-    <section id="projects" ref={rootRef} className="relative h-[100svh] min-h-[600px] w-full overflow-hidden bg-black text-white">
-      {/* ambient glow */}
+    <section id="projects" ref={rootRef} className="relative h-[100svh] w-full overflow-hidden bg-black text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_85%,rgba(118,171,174,.16),transparent_70%)]"
       />
 
-      {/* the ring the cards ride on (rotates with the scroll) */}
+      {/* ring the cards ride on */}
       <div ref={ringRef} aria-hidden="true" className="pointer-events-none absolute">
         <div className="absolute inset-0 rounded-full border border-white/15" />
         <div className="absolute rounded-full border border-dashed border-white/10" style={{ inset: "-6%" }} />
@@ -2242,7 +2215,7 @@ function ProjectsWheel() {
         ))}
       </div>
 
-      {/* project cards, placed on the ring by GSAP */}
+      {/* cards (size + position are set by GSAP; the width class is only a first-paint fallback) */}
       {visible.map((p, i) => (
         <div
           key={p.title}
@@ -2258,72 +2231,76 @@ function ProjectsWheel() {
               goTo(i);
             }
           }}
-          className="absolute left-1/2 top-0 w-[clamp(200px,26vw,420px)] cursor-pointer outline-none"
+          className="absolute left-1/2 top-0 w-[66vw] cursor-pointer touch-manipulation outline-none focus-visible:[&>div]:ring-2 focus-visible:[&>div]:ring-[#9fedf1] sm:w-[40vw] lg:w-[26vw]"
           style={{ opacity: 0 }}
         >
-          <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border border-white/15 bg-[#141414] shadow-2xl shadow-black/60">
+          <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-white/15 bg-[#141414] shadow-2xl shadow-black/60 sm:rounded-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.image} alt="" draggable={false} loading="lazy" className="h-full w-full object-cover" />
+            <img src={p.image} alt="" draggable={false} decoding="async" className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-3 sm:p-4">
-              <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-white/80 sm:text-xs">{p.category}</span>
-              <span className="font-display text-lg text-white/90 sm:text-2xl">{String(i + 1).padStart(2, "0")}</span>
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-2.5 sm:p-4">
+              <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/80 sm:text-xs">{p.category}</span>
+              <span className="font-display text-base text-white/90 sm:text-2xl">{String(i + 1).padStart(2, "0")}</span>
             </div>
           </div>
         </div>
       ))}
 
-      {/* text + filters (sits above the cards, lets clicks through) */}
-      <div className="pointer-events-none relative z-30 mx-auto flex h-full max-w-[88rem] flex-col px-5 pb-6 pt-24 sm:px-10 sm:pt-28">
-        <div className="pointer-events-auto -mx-1 flex gap-x-6 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-x-8 [&::-webkit-scrollbar]:hidden">
-          {filters.map((f) => (
-            <button
-              key={f}
-              onClick={() => pick(f)}
-              aria-pressed={filter === f}
-              className={`group relative shrink-0 py-2 text-sm font-medium transition-colors duration-300 ${
-                filter === f ? "text-white" : "text-white/50 hover:text-white"
-              }`}
-            >
-              {f}
-              <sup className={`ml-1 text-xs ${filter === f ? "text-[#aaeff3]" : "text-white/40"}`}>{countFor(f)}</sup>
-              <span
-                className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-[#9fedf1] transition-transform duration-500 ease-out ${
-                  filter === f ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"
+      {/* text + filters */}
+      <div className="pointer-events-none relative z-30 mx-auto flex h-full max-w-[88rem] flex-col px-5 pt-[clamp(4.5rem,12svh,7rem)] sm:px-10">
+        <div ref={infoRef}>
+          <div className="pointer-events-auto -mx-1 flex gap-x-6 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-x-8 [&::-webkit-scrollbar]:hidden">
+            {filters.map((f) => (
+              <button
+                key={f}
+                onClick={() => pick(f)}
+                aria-pressed={filter === f}
+                className={`group relative shrink-0 py-2 text-sm font-medium transition-colors duration-300 ${
+                  filter === f ? "text-white" : "text-white/50 hover:text-white"
                 }`}
-              />
-            </button>
-          ))}
-        </div>
-
-        {/* key remounts the block so the entrance animation replays for each project */}
-        <div key={active.title} aria-live="polite" className="mt-6 max-w-2xl sm:mt-8">
-          <div className="up flex items-center gap-3 text-xs" style={{ animationDelay: ".05s" }}>
-            <span className="rounded-full border border-[#76ABAE]/40 px-3 py-1 font-medium text-[#76ABAE]">{active.tag}</span>
-            <span className="text-white/45">{active.year}</span>
+              >
+                {f}
+                <sup className={`ml-1 text-xs ${filter === f ? "text-[#aaeff3]" : "text-white/40"}`}>{countFor(f)}</sup>
+                <span
+                  className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-[#9fedf1] transition-transform duration-500 ease-out ${
+                    filter === f ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"
+                  }`}
+                />
+              </button>
+            ))}
           </div>
-          <h2
-            className="up mt-3 font-display text-[clamp(2rem,6vw,5rem)] font-bold leading-[1.02] tracking-tight"
-            style={{ animationDelay: ".12s" }}
-          >
-            {active.title}
-          </h2>
-          <p className="up mt-4 max-w-xl text-sm leading-relaxed text-white/65 sm:text-base" style={{ animationDelay: ".2s" }}>
-            {active.text}
-          </p>
-          <Link
-            href="/contact"
-            className="pointer-events-auto up group mt-5 inline-flex items-center gap-2 text-sm font-medium text-white transition-colors hover:text-[#9fedf1] sm:text-base"
-            style={{ animationDelay: ".3s" }}
-          >
-            Start a similar project
-            <ArrowUpRight size={18} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-          </Link>
+
+          <div key={active.title} aria-live="polite" className="mt-3 max-w-2xl sm:mt-6">
+            <div className="up flex items-center gap-3 text-xs" style={{ animationDelay: ".05s" }}>
+              <span className="rounded-full border border-[#76ABAE]/40 px-3 py-1 font-medium text-[#76ABAE]">{active.tag}</span>
+            </div>
+            <h2
+              className="up mt-2 truncate font-display text-[clamp(1.75rem,min(6vw,8svh),5rem)] font-bold leading-[1.05] tracking-tight sm:mt-3"
+              style={{ animationDelay: ".12s" }}
+            >
+              {active.title}
+            </h2>
+            {/* hidden on very short (landscape phone) screens */}
+            <p
+              className="up mt-3 line-clamp-2 min-h-[2.9em] max-w-xl text-sm leading-relaxed text-white/65 sm:line-clamp-3 sm:min-h-[4.4em] sm:text-base [@media(max-height:520px)]:hidden"
+              style={{ animationDelay: ".2s" }}
+            >
+              {active.text || `${active.category} project delivered by Empire AE.`}
+            </p>
+            <Link
+              href="/contact"
+              className="pointer-events-auto up group mt-3 inline-flex items-center gap-2 text-sm font-medium text-white transition-colors hover:text-[#9fedf1] sm:mt-4 sm:text-base"
+              style={{ animationDelay: ".3s" }}
+            >
+              Start a similar project
+              <ArrowUpRight size={18} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* counter + progress */}
-      <div className="absolute inset-x-5 bottom-5 z-30 flex items-center gap-4 sm:inset-x-10">
+      <div ref={counterRef} className="absolute inset-x-5 bottom-4 z-30 flex items-center gap-4 sm:inset-x-10 sm:bottom-5">
         <span className="font-display text-sm tabular-nums text-white">
           {String(safeIdx + 1).padStart(2, "0")}
           <span className="text-white/40"> / {String(visible.length).padStart(2, "0")}</span>
@@ -3163,7 +3140,9 @@ const SW_CSS = `
    7. PAGE (default export)
    ===================================================================== */
 const RESPONSIVE_CSS = `
-/* Responsive safeguards: preserve the original animation systems, fix layout only. */
+/* Responsive safeguards: preserve the original animation systems, fix layout only.
+   NOTE: the Projects wheel (#projects) is sized by JS in ProjectsWheel(), so
+   there are intentionally no card/width/padding overrides for it here. */
 .home-root { width: 100%; max-width: 100%; overflow-x: clip; }
 .home-root *, .home-root *::before, .home-root *::after { box-sizing: border-box; }
 .home-root img, .home-root video, .home-root svg { max-width: 100%; }
@@ -3185,7 +3164,6 @@ const RESPONSIVE_CSS = `
 #services li { min-width: 0; }
 #services [data-fw-tilt] { transform-style: preserve-3d; }
 #projects { isolation: isolate; }
-#projects [data-pw-card] { max-width: calc(100vw - 2rem); }
 #contact-info a { overflow-wrap: anywhere; }
 
 @media (max-width: 767px) {
@@ -3204,13 +3182,6 @@ const RESPONSIVE_CSS = `
   #services header { align-items: flex-start; }
   #services ul { grid-template-columns: minmax(0, 1fr); }
   #services ul > li:nth-child(even) { margin-top: 0; }
-  #projects { height: 100svh; min-height: 640px; }
-  #projects .font-display { overflow-wrap: anywhere; }
-  #projects [data-pw-card] { width: min(68vw, 320px); }
-  #projects .pointer-events-none.relative.z-30 { padding-top: max(5.5rem, 10svh); }
-  #projects .pointer-events-auto { gap: 1.25rem; }
-  #projects .pointer-events-none.relative.z-30 > div[aria-live] { margin-top: 1rem; max-width: 100%; }
-  #projects .pointer-events-none.relative.z-30 > div[aria-live] p { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   #contact-info { border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; }
   #contact-info > div { padding: 4rem 1.25rem; gap: 2.5rem; }
   #contact-info .grid { grid-template-columns: minmax(0, 1fr); }
@@ -3225,17 +3196,11 @@ const RESPONSIVE_CSS = `
   .home-root section:first-of-type > button[aria-label="Mute video"], 
   .home-root section:first-of-type > button[aria-label="Unmute video"] { right: 1rem; bottom: 4.4rem; }
   .eae-reveal-text { font-size: clamp(1.45rem, 6.2vw, 1.9rem); }
-  #projects { min-height: 680px; }
-  #projects [data-pw-card] { width: min(70vw, 270px); }
-  #projects .pointer-events-none.relative.z-30 { padding-top: 5.25rem; }
-  #projects .pointer-events-none.relative.z-30 > div[aria-live] p { font-size: .8rem; line-height: 1.45; }
-  #projects .absolute.inset-x-5.bottom-5 { left: 1rem; right: 1rem; }
   #contact-info .text-4xl { font-size: 2rem; }
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
   #services { padding-inline: 1.5rem; }
-  #projects [data-pw-card] { width: min(34vw, 360px); }
   #contact-info > div { gap: 2.5rem; padding-inline: 2rem; }
 }
 
