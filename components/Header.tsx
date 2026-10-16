@@ -40,7 +40,6 @@ const SERVICES: Service[] = [
 
 const LINKS = [
   { label: "Our Team", href: "/team" },
-  { label: "Industries", href: "/industries" },
   { label: "Works", href: "/works" },
   { label: "About", href: "/about" },
   { label: "Careers", href: "/careers" },
