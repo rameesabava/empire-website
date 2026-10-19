@@ -1,66 +1,2394 @@
-<<<<<<< HEAD
-
 "use client";
 
-import { useState, useEffect, useRef, ReactNode, MouseEvent } from "react";
+/**
+ * Empire AE – HOME PAGE (single file)
+ *
+ * Section order:
+ *   1. Video hero (4 videos, auto-advancing)
+ *   2. Scroll text reveal (per-character)
+ *   3. Brand showcase (black -> white) + Client reviews (scroll-controlled, mouse reveal)
+ *   4. Words showcase (Vision / Expertise / Success, pinned, zoom-through tunnel)
+ *   5. Services (concave scroll layout)
+ *   6. Projects (pinned circular wheel, fully responsive)  +  Contact info
+ *
+ * Requires:  npm install gsap lenis lucide-react
+ * Save as:   app/page.tsx
+ *
+ * Lenis (smooth scroll) is started once in Home() and drives GSAP ScrollTrigger.
+ * If your layout.tsx already runs Lenis, delete the Lenis effect in Home()
+ * and add `lenis.on("scroll", ScrollTrigger.update)` to your existing setup.
+ */
+
+import { useState, useEffect, useRef, ReactNode, type CSSProperties, type RefObject } from "react";
 import Link from "next/link";
-import {
-  ArrowRight, ArrowUp, ArrowUpRight, Check, CheckCircle2, Code2, Megaphone,
-  Monitor, Palette, Plus, Rocket, ShieldCheck, Smartphone, Users, Zap,
-} from "lucide-react";
-import { FaWhatsapp } from "react-icons/fa";
+import { ArrowRight, ArrowUpRight, ChevronsDown, Clock, Mail, Phone, Share2, Volume2, VolumeX } from "lucide-react";
+import Lenis from "lenis";
+import "lenis/dist/lenis.css";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-const navLinks = [
-  { label: "Home", href: "/" },
-  { label: "About", href: "/about" },
-  { label: "Services", href: "/services" },
-  { label: "Portfolio", href: "/portfolio" },
-  { label: "Contact", href: "/contact" },
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+  ScrollTrigger.config({ ignoreMobileResize: true });
+}
+
+/* Shared Lenis instance so the hero "scroll down" button can use it */
+let lenisInstance: Lenis | null = null;
+
+/* =====================================================================
+   1. HERO (4 VIDEOS)
+   Put your files in /public/videos/ :
+     hero-1.mp4 … hero-4.mp4   (each plays once, then the next one starts)
+     hero-1.jfif (poster + thumbnail in the "Next" card; one per slide is optional)
+   ===================================================================== */
+type HeroSlide = {
+  video: string;
+  poster: string;
+  title: string;
+  text: string;
+  cta: string;
+  href: string;
+};
+
+const HERO_SLIDES: HeroSlide[] = [
+  {
+    video: "/videos/homevideo1.mp4",
+    poster: "/videos/hero-1.jfif",
+    title: "Digital Solutions That Put You Ahead",
+    text: "Empire AE delivers innovative digital solutions that empower businesses to grow and succeed.",
+    cta: "",
+    href: "",
+  },
+  {
+    video: "/videos/video.mp4",
+    poster: "/videos/hero-1.jfif",
+    title: "Websites Built to Convert",
+    text: "",
+    cta: "Explore web design",
+    href: "/services",
+  },
+  {
+    video: "/videos/video.mp4",
+    poster: "/videos/hero-1.jfif",
+    title: "Apps People Love to Use",
+    text: "Powerful Android and iOS apps engineered for seamless experiences and real business growth.",
+    cta: "See mobile apps",
+    href: "/services",
+  },
+  {
+    video: "/videos/hero-4.mp4",
+    poster: "/videos/hero-1.jfif",
+    title: "Growth You Can Measure",
+    text: "SEO and digital marketing strategies that raise your visibility and bring customers to your door.",
+    cta: "Grow with us",
+    href: "/services",
+  },
 ];
 
-const marqueeItems = [
-  "Software Solutions", "Brand Identity", "Web Design", "Web Development",
-  "Mobile Apps", "Digital Marketing", "SEO", "E-Commerce", "Hosting & Domain",
+function VideoHero() {
+  const [current, setCurrent] = useState(0);
+  const [progress, setProgress] = useState(0); // 0–1 for the playing video
+  const [muted, setMuted] = useState(true);
+  const videos = useRef<(HTMLVideoElement | null)[]>([]);
+
+  const count = HERO_SLIDES.length;
+  const slide = HERO_SLIDES[current];
+  const next = HERO_SLIDES[(current + 1) % count];
+
+  const goTo = (i: number) => {
+    setProgress(0);
+    setCurrent(i);
+  };
+  const advance = () => {
+    setProgress(0);
+    setCurrent((c) => (c + 1) % count);
+  };
+
+  // Play only the active video (restarted from 0); pause the others.
+  useEffect(() => {
+    videos.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === current) {
+        v.currentTime = 0;
+        v.play().catch(() => {});
+      } else {
+        v.pause();
+      }
+    });
+  }, [current]);
+
+  useEffect(() => {
+    videos.current.forEach((v) => {
+      if (v) v.muted = muted;
+    });
+  }, [muted]);
+
+  const scrollDown = () => {
+    if (lenisInstance) lenisInstance.scrollTo(window.innerHeight, { duration: 1.2 });
+    else window.scrollTo({ top: window.innerHeight, behavior: "smooth" });
+  };
+
+  return (
+    <section className="relative isolate flex h-[100svh] min-h-[560px] w-full items-end overflow-hidden bg-[#222831]">
+      {/* all 4 videos stacked, the active one fades in */}
+      {HERO_SLIDES.map((s, i) => (
+        <video
+          key={s.video}
+          ref={(el) => {
+            videos.current[i] = el;
+          }}
+          src={s.video}
+          poster={s.poster}
+          muted={muted}
+          playsInline
+          preload={i === current || i === (current + 1) % count ? "auto" : "metadata"}
+          aria-hidden
+          onTimeUpdate={(e) => {
+            const v = e.currentTarget;
+            if (i === current && v.duration) setProgress(v.currentTime / v.duration);
+          }}
+          onEnded={() => {
+            if (i === current) advance();
+          }}
+          onError={() => {
+            // missing / broken file: move on after a moment so the hero never gets stuck
+            if (i === current) window.setTimeout(() => setCurrent((c) => (c === i ? (c + 1) % count : c)), 4000);
+          }}
+          className={`absolute inset-0 -z-20 h-full w-full object-cover transition-opacity duration-700 ${
+            i === current ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+
+      {/* readability overlays commented*/}
+      {/* <div className="absolute inset-0 -z-10 bg-[#222831]/55" />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(34,40,49,.85)_0%,rgba(34,40,49,.35)_55%,transparent_100%),linear-gradient(0deg,rgba(34,40,49,.9)_0%,transparent_40%)]" /> */}
+
+      <div className="mx-auto w-full max-w-[1500px] px-5 pb-32 sm:px-12 sm:pb-44 lg:px-[10%] lg:pb-36">
+        {/* key remounts the text so the entrance animation replays on every slide */}
+        <div key={current} className="max-w-3xl">
+          <h1
+            className="hero-title up mt-6 text-[clamp(2.25rem,9vw,3rem)] font-light leading-[1.12] text-[#EEEEEE] sm:text-6xl xl:text-7xl"
+            style={{ animationDelay: ".1s" }}
+          >
+            <span className="font-bold">{slide.title}</span>  
+            {/* gtext-white removed */}
+          </h1>
+          <p className="up mt-6 max-w-xl text-base leading-relaxed text-[#EEEEEE]/75 sm:text-lg" style={{ animationDelay: ".25s" }}>
+            {slide.text}
+          </p>
+          <Link
+            href={slide.href}
+            className="up group mt-8 inline-flex items-center gap-3 text-base font-medium text-[#EEEEEE] transition-colors hover:text-[#b3f1f4]"
+            style={{ animationDelay: ".4s" }}
+          >
+            {slide.cta}
+            {/* <ArrowRight size={20} className="transition-transform duration-300 group-hover:translate-x-2" /> */}
+          </Link>
+        </div>
+      </div>
+
+      {/* "Next" card with thumbnail + progress bars (hidden on phones) */}
+      <div className="absolute bottom-8 right-20 hidden w-[min(300px,36vw)] overflow-hidden bg-[#222831]/70 backdrop-blur-md sm:flex lg:right-[8%] lg:w-[min(300px,24vw)]">
+        <button
+          type="button"
+          onClick={advance}
+          aria-label={`Next: ${next.title}`}
+          className="w-[26%] shrink-0 bg-[#31363F] bg-cover bg-center"
+          style={{ backgroundImage: `url(${next.poster})` }}
+        />
+        <div className="flex min-w-0 flex-1 flex-col p-3">
+          <button type="button" onClick={advance} className="text-left text-[#EEEEEE]">
+            <span className="block text-xs">Next</span>
+            <span className="mt-0.5 block truncate text-sm font-light">{next.title}</span>
+          </button>
+          <div className="mt-2 flex gap-2">
+            {HERO_SLIDES.map((s, i) => (
+              <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-1.5">
+                <span className="block h-[2px] w-full overflow-hidden bg-white/30">
+                  <span
+                    className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
+                    style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
+                  />
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* progress bars for phones (the "Next" card is hidden there) */}
+      <div className="absolute bottom-[3.75rem] left-5 right-5 flex gap-2 sm:hidden">
+        {HERO_SLIDES.map((s, i) => (
+          <button key={s.video} type="button" onClick={() => goTo(i)} aria-label={`Show slide ${i + 1}`} className="flex-1 py-2">
+            <span className="block h-[2px] w-full overflow-hidden bg-white/30">
+              <span
+                className="block h-full origin-left bg-white transition-transform duration-300 ease-linear"
+                style={{ transform: `scaleX(${i < current ? 1 : i === current ? progress : 0})` }}
+              />
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* mute toggle */}
+      <button
+        onClick={() => setMuted((m) => !m)}
+        aria-label={muted ? "Unmute video" : "Mute video"}
+        className="absolute bottom-24 right-6 grid h-11 w-11 place-items-center text-[#EEEEEE] transition-colors hover:text-[#76ABAE] sm:bottom-8 lg:right-[2%]"
+      >
+        {muted ? <VolumeX size={26} strokeWidth={1.5} /> : <Volume2 size={26} strokeWidth={1.5} />}
+      </button>
+
+      {/* scroll down */}
+      <button
+        onClick={scrollDown}
+        aria-label="Scroll down"
+        className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[#EEEEEE] transition-colors hover:text-[#76ABAE]"
+      >
+        <ChevronsDown size={34} strokeWidth={1.25} className="animate-bounce" />
+      </button>
+    </section>
+  );
+}
+
+/* =====================================================================
+   2. SCROLL TEXT REVEAL (per-character)
+   ===================================================================== */
+
+const TEXT =
+  "At Empire AE, we believe technology should feel effortless, inspire the people who use it, and help ambitious businesses grow. We are here to build digital experiences that move your business forward.";
+
+// Words are kept as unbreakable units so wrapping stays natural;
+// each word's letters are individual spans.
+const WORD_LIST = TEXT.split(" ");
+
+const DIM = 0x55; // #555555
+const BRIGHT = 0xff; // #ffffff
+
+// How many characters make up the soft "leading edge" of the reveal.
+const EDGE = 6;
+
+// The reveal finishes at this fraction of the section's scroll range, so the
+// sentence is fully white well before the section ends (no dead scrolling).
+const REVEAL_DONE_AT = 0.88;
+
+const clamp = (v: number, min = 0, max = 1) => Math.min(max, Math.max(min, v));
+
+function ScrollTextReveal() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const paragraphRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const paragraph = paragraphRef.current;
+    if (!section || !paragraph) return;
+
+    // DOM order of the spans is the reading order.
+    const chars = Array.from(paragraph.querySelectorAll<HTMLSpanElement>("[data-char]"));
+    const count = chars.length;
+    if (!count) return;
+
+    // Last painted channel value per character (avoids redundant style writes).
+    const applied = new Array<number>(count).fill(-1);
+
+    const paint = (i: number, t: number) => {
+      const c = Math.round(DIM + (BRIGHT - DIM) * t);
+      if (applied[i] !== c) {
+        applied[i] = c;
+        chars[i].style.color = `rgb(${c}, ${c}, ${c})`;
+      }
+    };
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Reduced motion: show the whole sentence in white, no scroll animation.
+    if (reduceMotion) {
+      for (let i = 0; i < count; i++) paint(i, 1);
+      return;
+    }
+
+    const update = (progress: number) => {
+      // Reveal front moves from before the first character to past the last,
+      // so char 0 starts dim at progress 0 and the last char is white at the end.
+      const front = clamp(progress / REVEAL_DONE_AT) * (count + EDGE);
+      for (let i = 0; i < count; i++) {
+        paint(i, clamp((front - i) / EDGE));
+      }
+    };
+
+    update(0);
+
+    // GSAP pin (not CSS sticky): sticky silently breaks when any parent in the
+    // layout has overflow hidden/auto, which left the text scrolling away
+    // un-revealed followed by a long empty black gap. Pin works regardless, and
+    // the pin spacer supplies exactly the scroll distance needed (no blank).
+    // The section is only as tall as the text (+ small padding), so it is
+    // pinned when its CENTRE reaches the screen centre. The black wrapper
+    // fills the rest of the screen while pinned, and nothing is left over
+    // once the reveal ends (no tall empty black box).
+    const st = ScrollTrigger.create({
+      trigger: section,
+      start: "center center",
+      end: () => `+=${Math.round(window.innerHeight * 1.2)}`,
+      pin: true,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => update(self.progress),
+    });
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) ScrollTrigger.refresh();
+    });
+
+    return () => {
+      cancelled = true;
+      st.kill(true);
+    };
+  }, []);
+
+  return (
+    <div className="eae-reveal-wrap">
+    <section ref={sectionRef} className="eae-reveal">
+      <div className="eae-reveal-sticky">
+        <p ref={paragraphRef} className="eae-reveal-text">
+          {/* One coherent sentence for assistive tech */}
+          <span className="eae-sr-only">{TEXT}</span>
+
+          <span aria-hidden="true">
+            {WORD_LIST.map((word, w) => (
+              <span key={`w-${w}`}>
+                <span className="eae-word">
+                  {Array.from(word).map((char, c) => (
+                    <span key={`c-${w}-${c}`} data-char className="eae-char">
+                      {char}
+                    </span>
+                  ))}
+                </span>
+                {w < WORD_LIST.length - 1 ? " " : ""}
+              </span>
+            ))}
+          </span>
+        </p>
+      </div>
+    </section>
+    </div>
+  );
+}
+
+/* =====================================================================
+   3. DEMO DATA (replace with approved testimonials later)
+   ===================================================================== */
+
+type Testimonial = {
+  id: string;
+  name: string;
+  role: string;
+  company: string;
+  review: string;
+  /** Logo in its ORIGINAL colours (path in /public). */
+  image?: string;
+  /** A separate white/light version of the same logo. Wins over `image`. */
+  imageOnDark?: string;
+  /** Single-colour logo on a transparent PNG: draw it in white on the black avatar. */
+  whiteMask?: boolean;
+};
+
+const TESTIMONIALS: Testimonial[] = [
+  {
+    id: "nakshathra",
+    name: "Nakshathra Gold and Diamonds",
+    role: "Founder",
+    company: "",
+    review:
+      "Their engineering team helped us improve the reliability of our platform and simplify several complex workflows. The collaboration was professional and well organized.",
+    // Single-colour logo drawn in white. Swap the path if this is not the
+    // Gold and Diamonds logo.
+    image: "/images/logos/Nakshathra_Hrms.png",
+    whiteMask: true,
+  },
+  {
+  id: "fira",
+  name: "Fira",
+  role: "Founder",
+  company: "",
+  review:
+    "Their digital marketing strategies improved our online visibility, attracted more potential customers, and helped our business grow through effective campaigns.",
+  image: "/images/logos/fira.png",
+  //whiteMask: true,
+},
+  {
+    id: "charmika",
+    name: "Charmika",
+    role: "Founder",
+    company: "",
+    review:
+      "Working with this team was a great experience. They understood our product requirements, communicated clearly, and delivered a solution that fit our business needs.",
+    image: "/images/logos/Charmika.png",
+  },
+
+  {
+    id: "Nakshathra",
+    name: "Nakshathra",
+    role: "Founder",
+    company: "",
+    review:
+      "The team took the time to understand our challenges and proposed a practical solution. Their attention to detail and responsiveness made a real difference to our project.",
+   image: "/images/logos/Nakshathra_Hrms.png",
+    whiteMask: true,
+  },
+  {
+    id: "keralainstitutesalesapp",
+    name: "kerala institute",
+    role: "Founder",
+    company: "",
+    review:
+      "From planning to delivery, the team maintained a clear focus on quality and usability. The final solution gave us a stronger foundation for future improvements.",
+    image: "/images/logos/kerala_institute_sales_app.png",
+  },
 ];
 
-const services = [
-  { icon: Monitor, title: "Web Design", text: "Visually stunning, responsive websites that reflect your brand identity and deliver smooth user experiences across all devices." },
-  { icon: Code2, title: "Web Development", text: "Secure, scalable, high-performance websites built with the latest technologies to ensure smooth functionality and long-term growth." },
-  { icon: Smartphone, title: "Mobile App Development", text: "High-quality mobile apps that are fast, secure and scalable, delivering seamless experiences across Android and iOS." },
-  { icon: Palette, title: "Brand Identity", text: "Logos and complete brand systems that make your business instantly recognisable." },
-  { icon: Megaphone, title: "Digital Marketing & SEO", text: "Data-driven campaigns and search strategies that bring the right customers to you." },
-  { icon: Rocket, title: "Hosting & Support", text: "Secure hosting, regular backups and continuous monitoring so your website stays fast and online." },
+/* =====================================================================
+   3a. BRAND SHOWCASE (GSAP: six clipped slots, logos swap group by group)
+   ===================================================================== */
+
+const SHOWCASE_HEADING = "Brands using GSAP®";
+
+/* ---------------------------------------------------------------------
+   Showcase theme: a strict, BINARY switch driven by scroll position.
+   ---------------------------------------------------------------------
+   The showcase is themed only through the CSS variables --bs-bg / --bs-fg,
+   which every logo, border and decoration already reads. The section is
+   exactly one of two states, never anything in between:
+
+     default      -> DARK  (#000000 background, #FFFFFF text)   = Section 1
+     .is-light    -> LIGHT (#FFFFFF background, #000000 text)   = Section 3
+
+   One ScrollTrigger toggles the `is-light` class. There is no tween, no
+   gradient and no CSS transition, so no intermediate shade can ever appear.
+   STYLES below reads LIGHT.bg for Section 3 too, so the two always match.
+   --------------------------------------------------------------------- */
+const THEME_DARK = { bg: "#000000", fg: "#FFFFFF" };
+const THEME_LIGHT = { bg: "#FFFFFF", fg: "#000000" };
+
+// The switch point. "bottom 80%" = the showcase's lower edge has risen to 80%
+// of the viewport height, i.e. Section 3 now occupies the bottom 20% of the
+// screen. Above this scroll position: black. At or below it: white.
+// Tune this one string to switch earlier or later.
+const THEME_SWITCH_AT = "bottom 80%";
+
+type Dir = "up" | "down" | "left" | "right";
+
+type Variant =
+  | "intel" | "youtube" | "netflix" | "amazon" | "ford" | "samsung"
+  | "ea" | "nike" | "aol" | "gucci" | "mcdonalds" | "microsoft";
+
+type Brand = {
+  name: string;
+  variant: Variant;
+  /** Path to the logo image in /public. */
+  src?: string;
+  /** Visual size tweak relative to the shared slot box (1 = Indoor_petals reference).
+   *  Use it for logos with transparent padding or unusual aspect ratios. */
+  scale?: number;
+  /** "theme": draw the artwork in the showcase foreground colour (white on the
+   *  black theme, black on the white theme) via an alpha mask. Only for
+   *  single-colour logos on a transparent background.
+   *  "original": keep the artwork's own colours (default). */
+  colorMode?: "theme" | "original";
+};
+
+// Add more groups here. Every group needs the same number of brands
+// (one per slot) and the loop will cycle through them in this order.
+const BRAND_GROUPS: Brand[][] = [
+  [
+    { name: "CAIOR", variant: "intel", src: "/images/logos/caior.png", colorMode: "theme", scale: 1 },
+    { name: "Charmika", variant: "youtube", src: "/images/logos/Charmika.png", scale: 1 },
+    { name: "Credtree", variant: "netflix", src: "/images/logos/credtree.png", scale: 1 },
+    { name: "Fira", variant: "amazon", src: "/images/logos/Fira.png", colorMode: "theme", scale: 1 },
+    { name: "Devamshi", variant: "ford", src: "/images/logos/Devamshi.png", scale: 1 },
+    { name: "EGL", variant: "samsung", src: "/images/logos/EGL.png", scale: 1 },
+  ],
+  [
+    { name: "Elaamy", variant: "ea", src: "/images/logos/Elaamy.png", scale: 1 },
+    { name: "Ethenzaa", variant: "nike", src: "/images/logos/Ethenzaa.png", scale: 1 },
+    { name: "Nakshathra HRMS", variant: "aol", src: "/images/logos/Nakshathra_Hrms.png", colorMode: "theme", scale: 1 },
+    { name: "Indoor Petals", variant: "gucci", src: "/images/logos/kerala_institute_sales_app.png", scale: 1 }, // sizing reference
+    { name: "Gabby Talk", variant: "mcdonalds", src: "/images/logos/gabby_talk.png", scale: 1 },
+    { name: "HeartMate", variant: "microsoft", src: "/images/logos/suchiGo.png", scale: 1 },
+  ],
 ];
 
-const checks = [
-  "Client-Centric Approach",
-  "Dedicated Post-Launch Support",
-  "Fast Response & Issue Resolution",
-  "Continuous Performance Monitoring",
+// Per-slot motion, read from the reference video.
+//   exit      = direction the old logo travels while it leaves its slot
+//   enterFrom = side the new logo comes in from
+const SLOT_MOTION: { exit: Dir; enterFrom: Dir }[] = [
+  { exit: "left", enterFrom: "up" },
+  { exit: "down", enterFrom: "right" },
+  { exit: "right", enterFrom: "down" },
+  { exit: "down", enterFrom: "left" },
+  { exit: "left", enterFrom: "down" },
+  { exit: "down", enterFrom: "right" },
 ];
 
-const stats = [
-  { value: 9, suffix: "+", label: "Years of Experience" },
-  { value: 150, suffix: "+", label: "Websites Delivered" },
-  { value: 50, suffix: "+", label: "Happy Clients" },
-  { value: 100, suffix: "%", label: "Client Satisfaction" },
+// Timing in seconds (measured from the video, see notes in the reply).
+const TIMING = {
+  hold: 2.2, // how long a group stays on screen
+  stagger: 0.2, // delay between neighbouring slots
+  exitDuration: 0.32,
+  gap: 0.32, // empty moment between a logo leaving and the next arriving
+  enterDuration: 0.48,
+};
+
+// xPercent / yPercent offsets that push a logo fully out of its slot.
+const vec = (d: Dir) => {
+  switch (d) {
+    case "left": return { xPercent: -100, yPercent: 0 };
+    case "right": return { xPercent: 100, yPercent: 0 };
+    case "up": return { xPercent: 0, yPercent: -100 };
+    default: return { xPercent: 0, yPercent: 100 };
+  }
+};
+
+// Text used by the simple one-word marks.
+const MARK_TEXT: Partial<Record<Variant, string>> = {
+  intel: "intel",
+  netflix: "NETFLIX",
+  ford: "Ford",
+  samsung: "SAMSUNG",
+  nike: "NIKE",
+  aol: "Aol.",
+  gucci: "GUCCI",
+};
+
+function LogoMark({ brand }: { brand: Brand }) {
+  if (brand.src) {
+    const scaleStyle = { "--bs-logo-scale": brand.scale ?? 1 } as CSSProperties;
+
+    // Single-colour logo: alpha mask filled with the theme foreground, so it
+    // flips with the existing --bs-fg variable (no transition, no filter).
+    if (brand.colorMode === "theme") {
+      return (
+        <span
+          role="img"
+          aria-label={brand.name}
+          className="eae-bs-brand-image eae-bs-brand-theme"
+          style={{
+            ...scaleStyle,
+            WebkitMaskImage: `url(${brand.src})`,
+            maskImage: `url(${brand.src})`,
+          }}
+        />
+      );
+    }
+
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={brand.src}
+        alt={brand.name}
+        className="eae-bs-brand-image"
+        style={scaleStyle}
+        draggable={false}
+      />
+    );
+  }
+
+  switch (brand.variant) {
+    case "youtube":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-yt">
+          You<span className="eae-mk-yt-box">Tube</span>
+        </span>
+      );
+    case "amazon":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-amz">
+          <span>amazon</span>
+          <i aria-hidden="true" />
+        </span>
+      );
+    case "ea":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-ea">
+          <span>EA</span>
+          <small>GAMES</small>
+        </span>
+      );
+    case "mcdonalds":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-mcd">
+          <svg viewBox="0 0 24 20" aria-hidden="true">
+            <path d="M3 19V8C3 -1.5 12 -1.5 12 9C12 -1.5 21 -1.5 21 8V19" />
+          </svg>
+        </span>
+      );
+    case "microsoft":
+      return (
+        <span role="img" aria-label={brand.name} className="eae-mk eae-mk-ms">
+          <span className="eae-mk-ms-grid" aria-hidden="true">
+            <b /><b /><b /><b />
+          </span>
+          <span>Microsoft</span>
+        </span>
+      );
+    default:
+      return (
+        <span role="img" aria-label={brand.name} className={`eae-mk eae-mk-${brand.variant}`}>
+          {MARK_TEXT[brand.variant]}
+        </span>
+      );
+  }
+}
+
+function BrandShowcase({ groups }: { groups: Brand[][] }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  // itemRefs.current[group][slot] -> the logo element for that slot in that group
+  const itemRefs = useRef<(HTMLDivElement | null)[][]>([]);
+
+  const slotCount = groups[0]?.length ?? 0;
+
+  /* ---- Logo swap timeline (unchanged) ---------------------------------- */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || groups.length < 2 || slotCount === 0) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    // matchMedia cleans up everything created inside it, and lets visitors
+    // with reduced motion keep the static first group (see CSS).
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const { hold, stagger, exitDuration, gap, enterDuration } = TIMING;
+      const transition = (slotCount - 1) * stagger + exitDuration + gap + enterDuration;
+      const cycle = hold + transition;
+
+      const tl = gsap.timeline({ paused: true, repeat: -1 });
+
+      groups.forEach((_, g) => {
+        const next = (g + 1) % groups.length;
+        const start = g * cycle + hold;
+
+        for (let s = 0; s < slotCount; s++) {
+          const out = itemRefs.current[g]?.[s];
+          const incoming = itemRefs.current[next]?.[s];
+          const motion = SLOT_MOTION[s % SLOT_MOTION.length];
+          if (!out || !incoming) continue;
+
+          const tOut = start + s * stagger;
+          const tIn = tOut + exitDuration + gap;
+          const away = vec(motion.exit);
+          const from = vec(motion.enterFrom);
+
+          // Old logo slides out of its clipped slot, then fades at the very end.
+          tl.fromTo(
+            out,
+            { xPercent: 0, yPercent: 0 },
+            { ...away, duration: exitDuration, ease: "power2.in", immediateRender: false },
+            tOut
+          );
+          tl.fromTo(
+            out,
+            { autoAlpha: 1 },
+            { autoAlpha: 0, duration: exitDuration * 0.4, ease: "none", immediateRender: false },
+            tOut + exitDuration * 0.6
+          );
+
+          // New logo slides into the same slot from its own side.
+          tl.fromTo(
+            incoming,
+            { ...from },
+            { xPercent: 0, yPercent: 0, duration: enterDuration, ease: "power3.out", immediateRender: false },
+            tIn
+          );
+          tl.fromTo(
+            incoming,
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: enterDuration * 0.35, ease: "none", immediateRender: false },
+            tIn
+          );
+        }
+      });
+
+      // Only run while the section is on screen.
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top bottom",
+        end: "bottom top",
+        onToggle: (self) => (self.isActive ? tl.play() : tl.pause()),
+      });
+    });
+
+    return () => mm.revert();
+  }, [groups, slotCount]);
+
+  /* ---- Binary theme switch (black <-> white) ---------------------------
+     Active from THEME_SWITCH_AT to the end of the page => `is-light` on.
+     Because the state comes from the scroll position itself, fast scrolling,
+     jumps and scrolling back up always land on the correct theme. It only
+     toggles a class, so it cannot touch the logo timeline. Cleanup kills the
+     trigger and removes the class, so Strict Mode leaves exactly one trigger.
+     --------------------------------------------------------------------- */
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const st = ScrollTrigger.create({
+      trigger: section,
+      start: THEME_SWITCH_AT,
+      end: "max",
+      toggleClass: { targets: section, className: "is-light" },
+    });
+
+    return () => {
+      st.kill();
+      section.classList.remove("is-light");
+    };
+  }, []);
+
+  return (
+    <section ref={sectionRef} className="eae-bs" aria-label={SHOWCASE_HEADING}>
+    
+
+      <div className="eae-bs-row">
+        {Array.from({ length: slotCount }, (_, s) => (
+          <div key={s} className="eae-bs-slot">
+            {groups.map((group, g) => (
+              <div
+                key={`${g}-${group[s].name}`}
+                ref={(node) => {
+                  if (!itemRefs.current[g]) itemRefs.current[g] = [];
+                  itemRefs.current[g][s] = node;
+                }}
+                className={`eae-bs-logo${g === 0 ? " is-active" : ""}`}
+              >
+                <LogoMark brand={group[s]} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+/* =====================================================================
+   3b. CLIENT TESTIMONIALS
+   ===================================================================== */
+
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+function Chevron({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {direction === "left" ? (
+        <polyline points="15 18 9 12 15 6" />
+      ) : (
+        <polyline points="9 18 15 12 9 6" />
+      )}
+    </svg>
+  );
+}
+
+/* =====================================================================
+   3c. MOUSE REVEAL (Client Reviews only)
+   =====================================================================
+   A canvas that fills the review section, BEHIND the review content. Where
+   nothing is revealed it paints nothing, so the section stays pure white.
+   Where the cursor has been it shows a slowly drifting animated layer.
+
+   1. A smoothed copy of the cursor follows the real pointer (exponential
+      ease), so the reveal trails slightly and never jumps.
+   2. Cursor speed -> "energy" (fast attack, slow release). Energy drives
+      blob size and strength: a stopped cursor settles back to clean white.
+   3. Each frame, soft radial blobs are stamped into an offscreen MASK along
+      the path travelled, stretched in the direction of motion and jittered
+      with sin() noise, so the edge is feathered and organic. The mask fades
+      every frame, which is the trail.
+   4. The animated layer is drawn, then clipped with `destination-in` + mask.
+
+   It only listens to pointer movement. It never reads wheel/touch/keys, so
+   it cannot advance reviews, and review transitions never restart it.
+   Touch: tap-to-reveal. Reduced motion: disabled (clean white surface).
+   ===================================================================== */
+
+// Colours of the revealed layer only. The section background is untouched.
+const REVEAL_COLORS = ["#bceae8", "#7fd6d1", "#f1dfdf", "#d7f1f7"];
+
+const REVEAL = {
+  scale: 0.5, // canvas resolution relative to CSS px
+  follow: 0.1, // seconds: how loosely the reveal trails the cursor
+  attack: 0.08, // seconds: energy rise time
+  release: 0.6, // seconds: energy fall time (how soon it settles once stopped)
+  trail: 0.28, // seconds: mask fade time constant (trail length)
+  fullSpeed: 700, // px/s that counts as "full energy"
+};
+
+// The animated layer: slowly drifting colour blobs and a soft moving highlight.
+function drawRevealLayer(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  t: number
+) {
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = REVEAL_COLORS[3];
+  ctx.fillRect(0, 0, w, h);
+
+  const m = Math.max(w, h);
+  const blobs = [
+    { c: REVEAL_COLORS[0], fx: 0.23, fy: 0.31, px: 0.0, py: 1.2, r: 0.55 },
+    { c: REVEAL_COLORS[1], fx: 0.17, fy: 0.27, px: 2.1, py: 0.4, r: 0.42 },
+    { c: REVEAL_COLORS[2], fx: 0.29, fy: 0.19, px: 4.2, py: 2.6, r: 0.5 },
+    { c: REVEAL_COLORS[0], fx: 0.13, fy: 0.35, px: 1.1, py: 3.3, r: 0.38 },
+    { c: REVEAL_COLORS[1], fx: 0.21, fy: 0.15, px: 5.0, py: 0.9, r: 0.3 },
+  ];
+
+  for (const b of blobs) {
+    const x = w * (0.5 + 0.45 * Math.sin(t * b.fx * 2 + b.px));
+    const y = h * (0.5 + 0.45 * Math.cos(t * b.fy * 2 + b.py));
+    const r = m * b.r;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, b.c);
+    g.addColorStop(1, `${b.c}00`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Soft highlight band drifting across the layer.
+  const bx = ((t * 0.05) % 1) * w * 1.6 - w * 0.3;
+  const band = ctx.createLinearGradient(bx, 0, bx + w * 0.35, h);
+  band.addColorStop(0, "rgba(255,255,255,0)");
+  band.addColorStop(0.5, "rgba(255,255,255,0.35)");
+  band.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = band;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function MouseReveal({ sectionRef }: { sectionRef: RefObject<HTMLElement | null> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const canvas = canvasRef.current;
+    if (!section || !canvas) return;
+
+    // Reduced motion: no effect at all, the surface simply stays clean white.
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const dctx = canvas.getContext("2d");
+      const mask = document.createElement("canvas");
+      const mctx = mask.getContext("2d");
+      if (!dctx || !mctx) return;
+
+      const S = REVEAL.scale;
+      let W = 1;
+      let H = 1;
+
+      // State (plain variables: no React updates on pointer movement).
+      const pointer = { cx: 0, cy: 0, valid: false };
+      let tap: { cx: number; cy: number } | null = null;
+      let sx = 0, sy = 0; // smoothed position, section-relative CSS px
+      let psx = 0, psy = 0; // previous smoothed position
+      let heading = 0;
+      let energy = 0;
+      let wasInside = false;
+      let time = 0;
+      let lastStamp = -999;
+      let idleCleared = true;
+      let visible = false;
+
+      const resize = () => {
+        const r = section.getBoundingClientRect();
+        W = Math.max(1, Math.round(r.width * S));
+        H = Math.max(1, Math.round(r.height * S));
+        canvas.width = mask.width = W;
+        canvas.height = mask.height = H;
+        idleCleared = false;
+        lastStamp = -999;
+      };
+
+      const stamp = (x: number, y: number, r: number, a: number, e: number) => {
+        mctx.save();
+        mctx.translate(x * S, y * S);
+        mctx.rotate(heading);
+        // Stretch along the direction of travel for a fluid, organic feel.
+        mctx.scale(1 + 0.55 * e, 1 / (1 + 0.25 * e));
+        for (let i = 0; i < 3; i++) {
+          const ang = time * (0.9 + 0.45 * i) + i * 2.1;
+          const ox = Math.cos(ang) * r * 0.26 * S;
+          const oy = Math.sin(ang * 1.3) * r * 0.26 * S;
+          const rr = r * S * (0.78 + 0.22 * Math.sin(time * 1.7 + i * 1.9));
+          const g = mctx.createRadialGradient(ox, oy, 0, ox, oy, rr);
+          g.addColorStop(0, `rgba(0,0,0,${a})`);
+          g.addColorStop(0.45, `rgba(0,0,0,${a * 0.7})`);
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          mctx.fillStyle = g;
+          mctx.beginPath();
+          mctx.arc(ox, oy, rr, 0, Math.PI * 2);
+          mctx.fill();
+        }
+        mctx.restore();
+      };
+
+      const tick = (_time: number, deltaMs: number) => {
+        if (!visible) return;
+        const dt = Math.min(deltaMs, 50) / 1000;
+        if (dt <= 0) return;
+        time += dt;
+
+        // Pointer relative to THIS section, re-read every frame so the reveal
+        // stays aligned while the page scrolls or the viewport resizes.
+        const rect = section.getBoundingClientRect();
+        const within = (cx: number, cy: number) =>
+          cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom;
+        const inside = pointer.valid && within(pointer.cx, pointer.cy);
+
+        if (tap) {
+          if (within(tap.cx, tap.cy)) {
+            sx = psx = tap.cx - rect.left;
+            sy = psy = tap.cy - rect.top;
+            energy = 1;
+          }
+          tap = null;
+        }
+
+        if (inside) {
+          const tx = pointer.cx - rect.left;
+          const ty = pointer.cy - rect.top;
+          if (!wasInside) {
+            sx = psx = tx; // snap on entry so there is no sweep from an old spot
+            sy = psy = ty;
+          }
+          const k = 1 - Math.exp(-dt / REVEAL.follow);
+          sx += (tx - sx) * k;
+          sy += (ty - sy) * k;
+        }
+        wasInside = inside;
+
+        const dist = Math.hypot(sx - psx, sy - psy);
+        const speed = dist / dt;
+        const target = inside ? Math.pow(clamp(speed / REVEAL.fullSpeed), 0.7) : 0;
+        const tau = target > energy ? REVEAL.attack : REVEAL.release;
+        energy += (target - energy) * (1 - Math.exp(-dt / tau));
+        if (dist > 0.5) heading = Math.atan2(sy - psy, sx - psx);
+
+        const active = energy > 0.02 || time - lastStamp < 2;
+        if (!active) {
+          if (!idleCleared) {
+            mctx.clearRect(0, 0, W, H);
+            canvas.style.opacity = "0";
+            idleCleared = true;
+          }
+          psx = sx;
+          psy = sy;
+          return;
+        }
+
+        // Fade the mask (this is the trail), then stamp along the path.
+        mctx.globalCompositeOperation = "destination-out";
+        mctx.fillStyle = `rgba(0,0,0,${1 - Math.exp(-dt / REVEAL.trail)})`;
+        mctx.fillRect(0, 0, W, H);
+        mctx.globalCompositeOperation = "source-over";
+
+        if (energy > 0.02) {
+          const R = clamp(Math.min(rect.width, rect.height) * 0.3, 110, 300);
+          const r = R * (0.35 + 0.65 * energy);
+          const a = clamp(energy * 1.8) * 0.95;
+          const steps = Math.min(24, Math.max(1, Math.ceil(dist / Math.max(4, r * 0.35))));
+          for (let i = 1; i <= steps; i++) {
+            const f = i / steps;
+            stamp(psx + (sx - psx) * f, psy + (sy - psy) * f, r, a, energy);
+          }
+          lastStamp = time;
+        }
+        psx = sx;
+        psy = sy;
+
+        // Animated layer, clipped by the mask.
+        dctx.globalCompositeOperation = "source-over";
+        drawRevealLayer(dctx, W, H, time);
+        dctx.globalCompositeOperation = "destination-in";
+        dctx.drawImage(mask, 0, 0);
+        dctx.globalCompositeOperation = "source-over";
+
+        canvas.style.opacity = "1";
+        idleCleared = false;
+      };
+
+      /* ---- Input: pointer only (never wheel / touchmove / keys) ---- */
+      const onMove = (e: PointerEvent) => {
+        if (e.pointerType === "touch") return;
+        pointer.cx = e.clientX;
+        pointer.cy = e.clientY;
+        pointer.valid = true;
+      };
+      const onDown = (e: PointerEvent) => {
+        if (e.pointerType !== "touch") return;
+        tap = { cx: e.clientX, cy: e.clientY }; // tap-to-reveal on touch
+      };
+      const onLeave = () => {
+        pointer.valid = false;
+      };
+
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerdown", onDown, { passive: true });
+      document.addEventListener("mouseleave", onLeave);
+      window.addEventListener("blur", onLeave);
+
+      const ro = new ResizeObserver(resize);
+      ro.observe(section);
+      resize();
+
+      // Only work while the section is on screen.
+      const io = new IntersectionObserver(([entry]) => {
+        visible = entry.isIntersecting;
+      });
+      io.observe(section);
+
+      gsap.ticker.add(tick);
+
+      return () => {
+        gsap.ticker.remove(tick);
+        io.disconnect();
+        ro.disconnect();
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerdown", onDown);
+        document.removeEventListener("mouseleave", onLeave);
+        window.removeEventListener("blur", onLeave);
+        canvas.style.opacity = "0";
+      };
+    });
+
+    return () => mm.revert();
+  }, [sectionRef]);
+
+  return <canvas ref={canvasRef} className="eae-rv-canvas" aria-hidden="true" />;
+}
+
+/* ---------------------------------------------------------------------
+   Tuning
+   --------------------------------------------------------------------- */
+const SLIDE_DURATION = 0.8; // seconds per horizontal transition
+const SLIDE_EASE = "power3.inOut";
+// The section counts as "active" (wheel/touch/keys control the reviews) while
+// it spans the middle band of the screen: its top is above 30% of the viewport
+// height and its bottom is below 70%. The section no longer has to fill the
+// whole screen, so it can be compact (no blank bands above/below the review).
+// Lenis' `prevent` callback (see Home) uses the same rule via isReviewsEngaged().
+const ENGAGE_TOP = 0.3;
+const ENGAGE_BOTTOM = 0.7;
+// Wheel: px of accumulated delta that count as an intentional gesture, and
+// the pause (ms) between wheel events that separates one gesture from the next.
+// Trackpad momentum is one gesture, so a single swipe moves exactly one review.
+const WHEEL_THRESHOLD = 30;
+const WHEEL_GESTURE_GAP_MS = 100;
+const TOUCH_THRESHOLD = 40; // px swipe distance
+
+/** True while the review stage fills the viewport and owns wheel/touch input.
+ *  Shared by the reviews component and by Lenis' `prevent` option, so Lenis
+ *  steps aside ONLY while reviews are in control (smooth everywhere else). */
+function isReviewsEngaged(section: Element) {
+  const r = section.getBoundingClientRect();
+  const vh = window.innerHeight;
+  return r.top <= vh * ENGAGE_TOP && r.bottom >= vh * ENGAGE_BOTTOM;
+}
+
+type Step = 1 | -1; // 1 = next (enters from the right), -1 = previous (enters from the left)
+
+function ClientTestimonials({ items }: { items: Testimonial[] }) {
+  const count = items.length;
+  const sectionRef = useRef<HTMLElement>(null);
+  const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Source of truth for logic. React state is only mirrored for aria + the
+  // arrow buttons, and is set once per transition (never per wheel event).
+  const indexRef = useRef(0);
+  const busyRef = useRef(false);
+  const stepRef = useRef<((step: Step) => boolean) | null>(null);
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section || count === 0) return;
+
+    indexRef.current = 0;
+    busyRef.current = false;
+    setActive(0);
+
+    // Scopes every tween created below; revert() on cleanup kills them all.
+    const ctx = gsap.context(() => {}, section);
+
+    /* ---- One transition. Directions are explicit (not a reversed play) ---- */
+    const step = (dir: Step): boolean => {
+      if (busyRef.current) return false;
+
+      const from = indexRef.current;
+      const to = from + dir;
+      if (to < 0 || to >= count) return false;
+
+      const outgoing = slideRefs.current[from];
+      const incoming = slideRefs.current[to];
+      if (!outgoing || !incoming) return false;
+
+      indexRef.current = to;
+      setActive(to);
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      ctx.add(() => {
+        // Reduced motion: swap instantly, still scroll-controlled.
+        if (reduceMotion) {
+          gsap.set(outgoing, { autoAlpha: 0, xPercent: 0 });
+          gsap.set(incoming, { autoAlpha: 1, xPercent: 0 });
+          return;
+        }
+
+        busyRef.current = true;
+        const D = SLIDE_DURATION;
+
+        gsap
+          .timeline({
+            onComplete: () => {
+              busyRef.current = false;
+            },
+          })
+          // Incoming: from the right (dir 1) or from the left (dir -1) to centre.
+          .fromTo(
+            incoming,
+            { xPercent: 100 * dir },
+            { xPercent: 0, duration: D, ease: SLIDE_EASE },
+            0
+          )
+          .fromTo(
+            incoming,
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: D * 0.7, ease: "none" },
+            0
+          )
+          // Outgoing: to the left (dir 1) or to the right (dir -1).
+          .fromTo(
+            outgoing,
+            { xPercent: 0 },
+            { xPercent: -100 * dir, duration: D, ease: SLIDE_EASE },
+            0
+          )
+          .fromTo(
+            outgoing,
+            { autoAlpha: 1 },
+            { autoAlpha: 0, duration: D * 0.7, ease: "none" },
+            D * 0.3
+          );
+      });
+
+      return true;
+    };
+    stepRef.current = step;
+
+    /* ---- Is the review stage currently in control of the viewport? ---- */
+    const isActive = () => isReviewsEngaged(section);
+
+    // Don't hijack the wheel from an independently scrollable child.
+    const canScrollInside = (target: EventTarget | null, delta: number) => {
+      let node = target instanceof HTMLElement ? target : null;
+      while (node && node !== section) {
+        const oy = getComputedStyle(node).overflowY;
+        if ((oy === "auto" || oy === "scroll") && node.scrollHeight > node.clientHeight) {
+          const atTop = node.scrollTop <= 0;
+          const atBottom = node.scrollTop + node.clientHeight >= node.scrollHeight - 1;
+          if (delta < 0 ? !atTop : !atBottom) return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    };
+
+    /* ---- Wheel / trackpad ---------------------------------------------
+       A "gesture" = a run of wheel events with gaps < WHEEL_GESTURE_GAP_MS.
+       - A gesture that STARTS while the section is not active (e.g. the
+         momentum that carried the page here) is ignored for its whole length.
+       - An active gesture moves at most one review, then its remaining
+         momentum is swallowed so it can't skip or scroll the page.
+       - A gesture that would go past the first/last review is never
+         intercepted, so the page scrolls on natively (no trap).
+       ------------------------------------------------------------------ */
+    let lastWheel = 0;
+    let wArmed = false;
+    let wConsumed = false;
+    let acc = 0;
+
+    const toPx = (e: WheelEvent, v: number) =>
+      e.deltaMode === 1 ? v * 16 : e.deltaMode === 2 ? v * window.innerHeight : v;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return; // pinch-zoom
+
+      const now = performance.now();
+      if (now - lastWheel > WHEEL_GESTURE_GAP_MS) {
+        wArmed = isActive();
+        wConsumed = false;
+        acc = 0;
+      }
+      lastWheel = now;
+      if (!wArmed) return;
+
+      const dx = toPx(e, e.deltaX);
+      const dy = toPx(e, e.deltaY);
+      const horizontal = Math.abs(dx) > Math.abs(dy);
+      const delta = horizontal ? dx : dy;
+      if (delta === 0) return;
+
+      if (!horizontal && canScrollInside(e.target, delta)) {
+        wArmed = false;
+        return;
+      }
+
+      // Transition running, or momentum after one: swallow, don't advance again.
+      if (wConsumed || busyRef.current) {
+        wConsumed = true;
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+
+      const dir: Step = delta > 0 ? 1 : -1;
+      const to = indexRef.current + dir;
+
+      if (to < 0 || to >= count) {
+        // Horizontal swipes can't leave the section vertically; swallow them
+        // (also avoids the browser's back/forward swipe). Vertical ones leave.
+        if (horizontal) {
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        wArmed = false; // native scroll takes over for this whole gesture
+        return;
+      }
+
+      if (e.cancelable) e.preventDefault();
+      acc += delta;
+      if (Math.abs(acc) >= WHEEL_THRESHOLD) {
+        wConsumed = true;
+        step(acc > 0 ? 1 : -1);
+      }
+    };
+
+    /* ---- Touch: swipe up / left = next, swipe down / right = previous ---- */
+    let tArmed = false;
+    let tConsumed = false;
+    let sx = 0;
+    let sy = 0;
+
+    const onTouchStart = (e: TouchEvent) => {
+      tArmed = e.touches.length === 1 && isActive();
+      tConsumed = false;
+      if (tArmed) {
+        sx = e.touches[0].clientX;
+        sy = e.touches[0].clientY;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!tArmed) return;
+      if (e.touches.length !== 1) {
+        tArmed = false;
+        return;
+      }
+      const t = e.touches[0];
+      const dx = sx - t.clientX;
+      const dy = sy - t.clientY;
+      const horizontal = Math.abs(dx) > Math.abs(dy);
+      const d = horizontal ? dx : dy;
+      if (d === 0) return;
+
+      if (tConsumed || busyRef.current) {
+        tConsumed = true;
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
+
+      const dir: Step = d > 0 ? 1 : -1;
+      const to = indexRef.current + dir;
+      if (to < 0 || to >= count) {
+        if (horizontal) {
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        tArmed = false; // let the page scroll out of the section
+        return;
+      }
+
+      // Decided on the first move so the browser never starts a page scroll.
+      if (e.cancelable) e.preventDefault();
+      if (Math.abs(d) >= TOUCH_THRESHOLD) {
+        tConsumed = true;
+        step(dir);
+      }
+    };
+
+    /* ---- Keyboard: Left / Right arrows while the section is active ---- */
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (!isActive()) return;
+      if (step(e.key === "ArrowRight" ? 1 : -1)) e.preventDefault();
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("keydown", onKeyDown);
+      stepRef.current = null;
+      ctx.revert();
+      indexRef.current = 0;
+      busyRef.current = false;
+    };
+  }, [count]);
+
+  if (count === 0) return null;
+
+  return (
+    <section
+      ref={sectionRef}
+      className="eae-showcase"
+      /* No data-lenis-prevent here: it made the whole section scroll natively
+         (visible stutter). Lenis' `prevent` option in Home() steps aside only
+         while the reviews are actually in control of wheel/touch. */
+      aria-roledescription="carousel"
+      aria-label="Client reviews"
+    >
+      <MouseReveal sectionRef={sectionRef} />
+
+      <div className="eae-container">
+        <div className="eae-header">
+          <h2 className="eae-heading">What clients say about us</h2>
+          <div className="eae-controls">
+            <button
+              type="button"
+              className="eae-arrow"
+              onClick={() => stepRef.current?.(-1)}
+              disabled={active === 0}
+              aria-label="Previous testimonial"
+            >
+              <Chevron direction="left" />
+            </button>
+            <button
+              type="button"
+              className="eae-arrow"
+              onClick={() => stepRef.current?.(1)}
+              disabled={active === count - 1}
+              aria-label="Next testimonial"
+            >
+              <Chevron direction="right" />
+            </button>
+          </div>
+        </div>
+
+        {/* Stationary stage: every review shares one grid cell, so the stage is
+            as tall as the tallest review and only the content slides. */}
+        <div className="eae-viewport" aria-live="polite">
+          {items.map((item, i) => (
+            <div
+              key={item.id}
+              ref={(node) => {
+                slideRefs.current[i] = node;
+              }}
+              className={`eae-slide${i === 0 ? " eae-slide--initial" : ""}`}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={`${i + 1} of ${count}`}
+              aria-hidden={i !== active}
+            >
+              <div className="eae-content">
+                <div className="eae-person">
+                  <div className="eae-avatar" aria-hidden="true">
+                    {item.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={item.image} alt="" />
+                    ) : (
+                      getInitials(item.name)
+                    )}
+                  </div>
+                  <div>
+                    <p className="eae-name">{item.name}</p>
+                    <p className="eae-meta">{item.role}</p>
+                    <p className="eae-meta">{item.company}</p>
+                  </div>
+                </div>
+
+                <blockquote className="eae-quote">{item.review}</blockquote>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* =====================================================================
+   4. SERVICES (concave scroll layout)
+   ===================================================================== */
+type ServiceMedia =
+  | { type: "image"; src: string; alt: string }
+  | { type: "video"; src: string; poster?: string };
+
+type Service = {
+  slug: string;
+  title: string;
+  description: string; // short text shown on the card
+  tags: string[]; // sub-services / deliverables
+  href: string; // change to match your routes
+  bg: string; // active card background + media base colour
+  fg: string; // active text colour
+  accent: string; // placeholder artwork accent
+  shadow: number; // 0–1 shadow darkness when active
+  media?: ServiceMedia; // optional real image/video
+};
+
+const PAGE_TITLE = "Our Services";
+const PAGE_INTRO =
+  "From ideas to breakthrough results, we craft powerful digital experiences that amplify your brand, captivate your audience, and turn clicks into customers.";
+const CTA_LABEL = "Start a project";
+const CTA_HREF = "/contact";
+
+const SERVICES: Service[] = [
+  {
+    slug: "web-designing",
+    title: "Web Designing",
+    description: "We create stunning, responsive websites that captivate visitors and elevate your brand.",
+    tags: ["UI/UX Design", "Responsive", "Brand Identity"],
+    href: "/services",
+    bg: "#1a1411",
+    fg: "#ffedd7",
+    accent: "#e8a15a",
+    shadow: 0.9,
+  },
+  {
+    slug: "web-development",
+    title: "Web Development",
+    description: "We build secure, scalable websites engineered for performance and growth.",
+    tags: ["React / Next.js", "WordPress", "Laravel"],
+    href: "/services",
+    bg: "#121414",
+    fg: "#ffffff",
+    accent: "#3dd6c6",
+    shadow: 0.9,
+  },
+  {
+    slug: "mobile-app-development",
+    title: "Mobile App Development",
+    description: "We develop powerful Android and iOS apps for seamless user experiences.",
+    tags: ["Android", "iOS", "Flutter"],
+    href: "/services",
+    bg: "#E3E3F8",
+    fg: "#000000",
+    accent: "#7b7be8",
+    shadow: 0.95,
+  },
+  {
+    slug: "hosting-domain",
+    title: "Hosting & Domain",
+    description: "We keep your website fast, secure, and online with reliable hosting solutions.",
+    tags: ["SSL Security", "99.9% Uptime", "Daily Backups"],
+    href: "/services",
+    bg: "#EFD5D3",
+    fg: "#000000",
+    accent: "#d8554f",
+    shadow: 0.95,
+  },
+  {
+    slug: "digital-marketing",
+    title: "Digital Marketing",
+    description: "We boost visibility and attract customers through result-driven digital strategies.",
+    tags: ["SEO", "Social Media", "Content Marketing"],
+    href: "/services",
+    bg: "#111a13",
+    fg: "#d9f3de",
+    accent: "#5fbf7a",
+    shadow: 0.9,
+  },
+  {
+    slug: "e-commerce-application",
+    title: "E-Commerce Application",
+    description: "We build seamless online stores that turn visitors into loyal customers.",
+    tags: ["WooCommerce", "Payment Gateway", "Inventory Management"],
+    href: "/services",
+    bg: "#BFE3FA",
+    fg: "#0a2540",
+    accent: "#6cb8ee",
+    shadow: 0.95,
+  },
+  {
+    slug: "software-application",
+    title: "Software Application",
+    description: "We create custom software that streamlines workflows and boosts productivity.",
+    tags: ["ERP Systems", "CRM", "Custom Software"],
+    href: "/services",
+    bg: "#1a1411",
+    fg: "#ffedd7",
+    accent: "#e8a15a",
+    shadow: 0.9,
+  },
+  {
+    slug: "seo",
+    title: "SEO",
+    description: "We improve search rankings, increase organic traffic, and grow your online reach.",
+    tags: ["On-Page SEO", "Off-Page SEO", "Keyword Optimization"],
+    href: "/services",
+    bg: "#121414",
+    fg: "#ffffff",
+    accent: "#3dd6c6",
+    shadow: 0.9,
+  },
 ];
 
-const faqs = [
-  { q: "How long does it take to build a website?", a: "Most websites are completed within 1–3 weeks, depending on the project scope and content availability. We keep you informed at every stage of the process." },
-  { q: "Do you provide hosting and maintenance?", a: "Yes. We offer secure hosting with regular backups, performance monitoring, and ongoing technical support to keep your site running perfectly." },
+/* ---- curve config (distances are % of the card's own size) ---- */
+type CurveConfig = {
+  tiltX: number; // degrees of rotateX at the viewport edge (faces the centre)
+  tiltY: number; // degrees of rotateY toward the centre (two-column layout)
+  depth: number; // px the edges come toward the viewer (concave depth)
+  pull: number; // % of card height edge cards are pulled toward the centre
+  inward: number; // % of card width edge cards slide toward the centre line
+  scrub: number; // smoothing, seconds
+  perspective: number;
+};
+type CurveBreakpoints = Record<"desktop" | "tablet" | "mobile", CurveConfig>;
+
+const DEFAULT_CURVE: CurveBreakpoints = {
+  desktop: { tiltX: 16, tiltY: 9, depth: 170, pull: 5, inward: 4, scrub: 0.6, perspective: 1300 },
+  tablet: { tiltX: 16, tiltY: 9, depth: 140, pull: 5, inward: 3, scrub: 0.6, perspective: 1200 },
+  // phones: same motion, depth/tilt trimmed so the leaning cards never overflow a narrow screen
+  mobile: { tiltX: 14, tiltY: 7, depth: 90, pull: 4, inward: 0, scrub: 0.5, perspective: 1000 },
+};
+
+// Keyframes per card for the curved scroll motion. 12 looks identical to the
+// old 28 but is far lighter on the main thread (8 cards x 3D transforms).
+const STEPS = 12;
+const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
+const WIDTH = "w-[min(100%,520px)] md:w-[min(94%,1120px)] lg:w-[min(72vw,1120px)]";
+
+/** side: -1 = left column, +1 = right column, 0 = single column. */
+function sample(t: number, side: number, c: CurveConfig) {
+  const d = 1 - 2 * t; // +1 below centre … -1 above centre
+  const arc = d * (Math.PI / 2);
+  return {
+    rotationX: d * c.tiltX,
+    rotationY: -side * Math.abs(d) * c.tiltY * 0.6 - side * c.tiltY * 0.4,
+    z: c.depth * (1 - Math.cos(arc)),
+    yPercent: -Math.sin(arc) * c.pull,
+    xPercent: -side * (1 - Math.cos(arc)) * c.inward,
+  };
+}
+
+function buildCurve(el: HTMLElement, side: number, c: CurveConfig) {
+  // Trigger on the <li> so the animated transform never feeds back into
+  // ScrollTrigger's start/end measurements.
+  const trigger = el.closest("li") ?? el;
+  gsap.set(el, { ...sample(0, side, c), transformPerspective: c.perspective, force3D: true });
+  const tl = gsap.timeline({
+    defaults: { ease: "none" },
+    scrollTrigger: { trigger, start: "top bottom", end: "bottom top", scrub: c.scrub },
+  });
+  for (let k = 1; k <= STEPS; k++) tl.to(el, { ...sample(k / STEPS, side, c), duration: 1 });
+}
+
+/* Active-card state lives in data attributes (no React re-renders). */
+function activateCard(root: HTMLElement, cards: HTMLElement[], card: HTMLElement) {
+  cards.forEach((c) => {
+    c.dataset.active = c === card ? "true" : "false";
+    c.dataset.dim = c === card ? "false" : "true";
+  });
+  root.dataset.hot = "true";
+  root.style.setProperty("--fw-sbg", card.style.getPropertyValue("--fw-bg"));
+  root.style.setProperty("--fw-sfg", card.style.getPropertyValue("--fw-fg"));
+}
+
+function deactivateCard(root: HTMLElement, cards: HTMLElement[], card: HTMLElement) {
+  card.dataset.active = "false";
+  if (cards.some((c) => c.dataset.active === "true")) return; // another card took over
+  cards.forEach((c) => (c.dataset.dim = "false"));
+  root.dataset.hot = "false";
+  root.style.removeProperty("--fw-sbg");
+  root.style.removeProperty("--fw-sfg");
+}
+
+/* ---- rolling title ---- */
+function RollingTitle({ text }: { text: string }) {
+  const words = text.split(" ");
+  let index = 0;
+  return (
+    <span className="block">
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true" className="block">
+        {words.map((word, w) => (
+          <span key={w}>
+            <span className="inline-flex whitespace-nowrap">
+              {Array.from(word).map((ch, c) => {
+                const i = index++;
+                return (
+                  <span key={c} className="inline-block h-[1.25em] overflow-hidden leading-[1.25em]">
+                    <span
+                      className={`block transition-transform duration-500 ${EASE} group-data-[active=true]:-translate-y-1/2 motion-reduce:transition-none`}
+                      style={{ transitionDelay: `${i * 18}ms` }}
+                    >
+                      <span className="block">{ch}</span>
+                      <span className="block">{ch}</span>
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+            {w < words.length - 1 && <span className="inline-block w-[0.3em]" />}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/* ---- media (real media or CSS artwork) ---- */
+function ServiceMediaView({ service, index }: { service: Service; index: number }) {
+  const { media, bg, fg, accent, title } = service;
+
+  if (media?.type === "image") {
+    return (
+      <div
+        role="img"
+        aria-label={media.alt}
+        className="size-full bg-cover bg-center"
+        style={{ backgroundColor: bg, backgroundImage: `url(${media.src})` }}
+      />
+    );
+  }
+  if (media?.type === "video") {
+    return (
+      <video
+        className="size-full object-cover"
+        src={media.src}
+        poster={media.poster}
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-label={`${title} preview`}
+      />
+    );
+  }
+
+  const variant = index % 3;
+  const fgSoft = `color-mix(in srgb, ${fg} 22%, transparent)`;
+  const blob = (x: string, y: string, size: string, color: string): CSSProperties => ({
+    left: x,
+    top: y,
+    width: size,
+    height: size,
+    background: `radial-gradient(circle at 35% 35%, ${color}, transparent 65%)`,
+  });
+
+  return (
+    <div className="relative size-full overflow-hidden" style={{ backgroundColor: bg }} aria-hidden="true">
+      <div className="fw-drift-a absolute rounded-full blur-2xl" style={blob("-8%", "-20%", "70%", accent)} />
+      <div
+        className="fw-drift-b absolute rounded-full opacity-70 blur-3xl"
+        style={blob("45%", "30%", "65%", `color-mix(in srgb, ${accent} 60%, ${fg})`)}
+      />
+      {variant === 0 && (
+        <div
+          className="absolute left-1/2 top-1/2 aspect-square w-[34%] -translate-x-1/2 -translate-y-1/2 rounded-full border"
+          style={{ borderColor: fgSoft, boxShadow: `0 0 0 clamp(14px,2.4vw,40px) ${fgSoft}` }}
+        />
+      )}
+      {variant === 1 && (
+        <div
+          className="absolute left-1/2 top-1/2 aspect-square w-[30%] -translate-x-1/2 -translate-y-1/2 rotate-12 rounded-[28%] border"
+          style={{ borderColor: fgSoft, background: `linear-gradient(135deg, ${fgSoft}, transparent)` }}
+        />
+      )}
+      {variant === 2 && (
+        <div className="absolute inset-x-[18%] bottom-[14%] flex h-[46%] items-end gap-[3%]">
+          {[0.45, 0.8, 0.62, 1, 0.55].map((h, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-t-full border"
+              style={{ height: `${h * 100}%`, borderColor: fgSoft, background: `linear-gradient(to top, ${fgSoft}, transparent)` }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---- service card ---- */
+function ServiceCard({ service, index }: { service: Service; index: number }) {
+  const style = {
+    "--fw-bg": service.bg,
+    "--fw-fg": service.fg,
+    "--fw-shadow": service.shadow,
+  } as CSSProperties;
+
+  return (
+    <li className="min-w-0">
+      {/* Layer 1 – GSAP: curved scroll motion */}
+      <div data-fw-motion className="will-change-transform">
+        {/* Layer 2 – GSAP: pointer tilt (desktop only) */}
+        <div data-fw-tilt className="will-change-transform">
+          {/* Layer 3 – CSS: active / hover styling */}
+          <Link
+            href={service.href}
+            data-fw-card
+            data-active="false"
+            data-dim="false"
+            style={style}
+            className={`group block rounded-[1.1rem] bg-[color-mix(in_srgb,currentColor_7%,transparent)] p-1.5 outline-none ring-1 ring-transparent transition-[background-color,color,transform,box-shadow,opacity] duration-500 ${EASE} focus-visible:ring-2 focus-visible:ring-current data-[active=true]:scale-[1.02] data-[active=true]:bg-[var(--fw-bg)] data-[active=true]:text-[var(--fw-fg)] data-[active=true]:shadow-[0_40px_90px_-30px_rgba(0,0,0,var(--fw-shadow))] data-[active=true]:ring-[color-mix(in_srgb,var(--fw-fg)_22%,transparent)] data-[dim=true]:opacity-40 motion-reduce:transition-none sm:rounded-[1.4rem] sm:p-2`}
+          >
+            <div className="relative aspect-[16/9] overflow-hidden rounded-[0.7rem] sm:aspect-[2/1] sm:rounded-[1.05rem] lg:aspect-[2/1]">
+              <div data-fw-media-inner className="size-full will-change-transform">
+                <ServiceMediaView service={service} index={index} />
+              </div>
+              {/* pointer spotlight */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-data-[active=true]:opacity-100"
+                style={{ background: "radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.4), transparent 55%)" }}
+              />
+            </div>
+
+            <div className="px-2 pb-1 pt-2.5 sm:px-2.5 sm:pb-1.5 sm:pt-3">
+              <p className="text-[0.7rem] leading-snug opacity-70 sm:text-[0.8rem]">{service.tags.join(" • ")}</p>
+
+              <div className="relative mt-1.5 text-[clamp(1.1rem,0.95rem+1vw,1.75rem)] font-medium leading-tight tracking-tight">
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-0 top-[0.6em] size-[0.55em] -translate-x-3 -translate-y-1/2 rounded-full bg-current opacity-0 transition-[transform,opacity] duration-500 ${EASE} group-data-[active=true]:translate-x-0 group-data-[active=true]:opacity-100 motion-reduce:transition-none`}
+                />
+                <div
+                  className={`w-[calc(100%-0.85em)] transition-transform duration-500 ${EASE} group-data-[active=true]:translate-x-[0.85em] motion-reduce:transition-none`}
+                >
+                  <RollingTitle text={service.title} />
+                </div>
+                <p className="mt-2 line-clamp-2 text-[0.8rem] font-normal leading-relaxed tracking-normal opacity-70 sm:text-sm">
+                  {service.description}
+                </p>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/* ---- services section ---- */
+function ServicesSection({
+  services = SERVICES,
+  curve,
+  ctaHref = CTA_HREF,
+  ctaLabel = CTA_LABEL,
+}: {
+  services?: Service[];
+  curve?: Partial<{ [K in keyof CurveBreakpoints]: Partial<CurveConfig> }>;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  const rootRef = useRef<HTMLElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const cursor = cursorRef.current;
+
+    // gsap.matchMedia is a scoped context: everything created inside is
+    // reverted when a query stops matching or on mm.revert().
+    const mm = gsap.matchMedia(root);
+
+    mm.add(
+      {
+        desktop: "(min-width: 1024px)",
+        tablet: "(min-width: 768px) and (max-width: 1023.98px)",
+        reduceMotion: "(prefers-reduced-motion: reduce)",
+        canHover: "(hover: hover) and (pointer: fine)",
+      },
+      (ctx) => {
+        const { desktop, tablet, reduceMotion, canHover } = ctx.conditions as Record<string, boolean>;
+        const cards = gsap.utils.toArray<HTMLElement>("[data-fw-card]");
+        const motions = gsap.utils.toArray<HTMLElement>("[data-fw-motion]");
+        const fx = !reduceMotion;
+
+        // 1. Curved scroll motion
+        if (fx) {
+          const key = desktop ? "desktop" : tablet ? "tablet" : "mobile";
+          const cfg = { ...DEFAULT_CURVE[key], ...curve?.[key] };
+          motions.forEach((el, i) => {
+            // Left cards lean right, right cards lean left (alternates in the single phone column too).
+            const side = i % 2 === 0 ? -1 : 1;
+            buildCurve(el, side, cfg);
+          });
+        }
+
+        const cleanups: Array<() => void> = [];
+        const inner = (card: HTMLElement) => card.querySelector<HTMLElement>("[data-fw-media-inner]");
+
+        if (fx)
+          cards.forEach((card) => {
+            const m = inner(card);
+            if (m) gsap.set(m, { scale: 1.08 });
+          });
+
+        if (canHover) {
+          // 2a. Mouse: hover state, 3D tilt, media parallax, "View" cursor
+          const qx = cursor && fx ? gsap.quickTo(cursor, "x", { duration: 0.35, ease: "power3" }) : null;
+          const qy = cursor && fx ? gsap.quickTo(cursor, "y", { duration: 0.35, ease: "power3" }) : null;
+          if (cursor) gsap.set(cursor, { xPercent: -50, yPercent: -50, scale: 0, autoAlpha: 0 });
+
+          cards.forEach((card) => {
+            const tilt = card.closest<HTMLElement>("[data-fw-tilt]");
+            const media = inner(card);
+            if (fx && tilt) gsap.set(tilt, { transformPerspective: 900 });
+
+            const rx = fx && tilt ? gsap.quickTo(tilt, "rotationX", { duration: 0.6, ease: "power3" }) : null;
+            const ry = fx && tilt ? gsap.quickTo(tilt, "rotationY", { duration: 0.6, ease: "power3" }) : null;
+            const mx = fx && media ? gsap.quickTo(media, "x", { duration: 0.6, ease: "power3" }) : null;
+            const my = fx && media ? gsap.quickTo(media, "y", { duration: 0.6, ease: "power3" }) : null;
+
+            const enter = (e: PointerEvent | FocusEvent) => {
+              activateCard(root, cards, card);
+              if (!fx) return;
+              if (media) gsap.to(media, { scale: 1.14, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              if (cursor && e instanceof PointerEvent) {
+                cursor.style.background = card.style.getPropertyValue("--fw-fg");
+                cursor.style.color = card.style.getPropertyValue("--fw-bg");
+                if (gsap.getProperty(cursor, "autoAlpha") === 0) gsap.set(cursor, { x: e.clientX, y: e.clientY });
+                gsap.to(cursor, { scale: 1, autoAlpha: 1, duration: 0.4, ease: "power3.out", overwrite: "auto" });
+                card.style.cursor = "none";
+              }
+            };
+
+            const move = (e: PointerEvent) => {
+              const r = card.getBoundingClientRect();
+              const nx = (e.clientX - r.left) / r.width - 0.5;
+              const ny = (e.clientY - r.top) / r.height - 0.5;
+              card.style.setProperty("--mx", `${(nx + 0.5) * 100}%`);
+              card.style.setProperty("--my", `${(ny + 0.5) * 100}%`);
+              ry?.(nx * 7);
+              rx?.(-ny * 7);
+              mx?.(-nx * 12);
+              my?.(-ny * 12);
+              qx?.(e.clientX);
+              qy?.(e.clientY);
+            };
+
+            const leave = () => {
+              deactivateCard(root, cards, card);
+              card.style.cursor = "";
+              if (!fx) return;
+              rx?.(0);
+              ry?.(0);
+              mx?.(0);
+              my?.(0);
+              if (media) gsap.to(media, { scale: 1.08, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              if (cursor) gsap.to(cursor, { scale: 0, autoAlpha: 0, duration: 0.3, ease: "power3.in", overwrite: "auto" });
+            };
+
+            const focusOn = () => activateCard(root, cards, card);
+            const focusOff = () => deactivateCard(root, cards, card);
+
+            card.addEventListener("pointerenter", enter);
+            card.addEventListener("pointermove", move);
+            card.addEventListener("pointerleave", leave);
+            card.addEventListener("focus", focusOn);
+            card.addEventListener("blur", focusOff);
+            cleanups.push(() => {
+              card.removeEventListener("pointerenter", enter);
+              card.removeEventListener("pointermove", move);
+              card.removeEventListener("pointerleave", leave);
+              card.removeEventListener("focus", focusOn);
+              card.removeEventListener("blur", focusOff);
+              card.style.cursor = "";
+              deactivateCard(root, cards, card);
+            });
+          });
+        } else {
+          // 2b. Touch: the card nearest the middle of the screen becomes active
+          cards.forEach((card) => {
+            const media = inner(card);
+            const tilt = card.closest<HTMLElement>("[data-fw-tilt]");
+            if (fx && tilt) gsap.set(tilt, { transformPerspective: 900 });
+            const rx = fx && tilt ? gsap.quickTo(tilt, "rotationX", { duration: 0.6, ease: "power3" }) : null;
+            const ry = fx && tilt ? gsap.quickTo(tilt, "rotationY", { duration: 0.6, ease: "power3" }) : null;
+
+            // finger down / drag: spotlight + 3D tilt, like the mouse hover
+            const touchMove = (e: PointerEvent) => {
+              const r = card.getBoundingClientRect();
+              const nx = (e.clientX - r.left) / r.width - 0.5;
+              const ny = (e.clientY - r.top) / r.height - 0.5;
+              card.style.setProperty("--mx", `${(nx + 0.5) * 100}%`);
+              card.style.setProperty("--my", `${(ny + 0.5) * 100}%`);
+              ry?.(nx * 7);
+              rx?.(-ny * 7);
+            };
+            const touchEnd = () => {
+              rx?.(0);
+              ry?.(0);
+            };
+            card.addEventListener("pointerdown", touchMove);
+            card.addEventListener("pointermove", touchMove);
+            card.addEventListener("pointerup", touchEnd);
+            card.addEventListener("pointercancel", touchEnd);
+            card.addEventListener("pointerleave", touchEnd);
+
+            // media drifts with the scroll (stands in for the mouse parallax)
+            if (fx && media) {
+              gsap.fromTo(
+                media,
+                { yPercent: -3.5 },
+                { yPercent: 3.5, ease: "none", scrollTrigger: { trigger: card, start: "top bottom", end: "bottom top", scrub: true } }
+              );
+            }
+
+            cleanups.push(() => {
+              card.removeEventListener("pointerdown", touchMove);
+              card.removeEventListener("pointermove", touchMove);
+              card.removeEventListener("pointerup", touchEnd);
+              card.removeEventListener("pointercancel", touchEnd);
+              card.removeEventListener("pointerleave", touchEnd);
+            });
+
+            ScrollTrigger.create({
+              trigger: card,
+              start: "center 65%",
+              end: "center 35%",
+              onToggle: (self) => {
+                if (self.isActive) activateCard(root, cards, card);
+                else deactivateCard(root, cards, card);
+                if (fx && media) gsap.to(media, { scale: self.isActive ? 1.14 : 1.08, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              },
+            });
+            cleanups.push(() => deactivateCard(root, cards, card));
+          });
+        }
+
+        return () => cleanups.forEach((fn) => fn());
+      }
+    );
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) ScrollTrigger.refresh();
+    });
+
+    return () => {
+      cancelled = true;
+      mm.revert();
+    };
+  }, [curve, services]);
+
+  return (
+    <section
+      ref={rootRef}
+      id="services"
+      data-hot="false"
+      className="relative overflow-x-clip bg-[color:var(--fw-sbg,#ffffff)] px-4 py-[clamp(2rem,5vw,4.5rem)] text-[color:var(--fw-sfg,#0a0a0a)] transition-colors duration-700 ease-out motion-reduce:transition-none sm:px-6 lg:px-10"
+    >
+      <header className={`mx-auto mb-[clamp(1.5rem,3vw,2.5rem)] flex flex-col gap-4 md:flex-row md:items-end md:justify-between ${WIDTH}`}>
+        <h2 className="text-[clamp(2.25rem,1rem+4.5vw,5rem)] font-semibold leading-[0.95] tracking-tight">{PAGE_TITLE}</h2>
+        <p className="max-w-sm text-[0.95rem] leading-relaxed opacity-65 md:text-base">{PAGE_INTRO}</p>
+      </header>
+
+      <ul
+        className={`mx-auto grid grid-cols-1 items-start gap-x-[clamp(1.25rem,2.5vw,2.5rem)] gap-y-[clamp(1.25rem,3vw,2.5rem)] md:grid-cols-2 md:[&>li:nth-child(even)]:mt-[clamp(1.5rem,3.5vw,3.5rem)] ${WIDTH}`}
+      >
+        {services.map((service, i) => (
+          <ServiceCard key={service.slug} service={service} index={i} />
+        ))}
+      </ul>
+
+      <div className={`mx-auto mt-[clamp(1.5rem,3vw,2.5rem)] ${WIDTH}`}>
+        <Link
+          href={ctaHref}
+          className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-current px-6 py-3 text-base font-medium outline-none transition-opacity duration-300 hover:opacity-85 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-4"
+        >
+          <span className="inline-flex items-center gap-3 text-[color:var(--fw-sbg,#ffffff)]">
+            <span aria-hidden="true" className="size-2 rounded-full bg-current" />
+            <span>{ctaLabel}</span>
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="transition-transform duration-300 group-hover:translate-x-1 motion-reduce:transition-none"
+            >
+              <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M2.343 8h11.314m0 0L8.673 3.016M13.657 8l-4.984 4.984" />
+            </svg>
+          </span>
+        </Link>
+      </div>
+
+      {/* "View" cursor bubble (mouse devices only, positioned by GSAP) */}
+      <div
+        ref={cursorRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed left-0 top-0 z-50 flex size-[84px] items-center justify-center rounded-full text-sm font-medium opacity-0 invisible"
+      >
+        View
+      </div>
+    </section>
+  );
+}
+
+/* =====================================================================
+   5. PROJECTS (circular wheel) + CONTACT INFO
+   ===================================================================== */
+const filters = ["All Projects", "Web Development", "Mobile App", "Digital Marketing"] as const;
+type Filter = (typeof filters)[number];
+type Category = Exclude<Filter, "All Projects">;
+
+const projects: {
+  title: string;
+  tag: string;
+  category: Category;
+  text: string;
+  overlay: string;
+  image: string;
+}[] = [
+  { title: "Nakshathra HRMS", overlay: "Nakshathra", tag: "Mobile App", category: "Mobile App", text: "", image: "images/logos/Nakshathra_Hrms.png" },
+  { title: "Miorah", overlay: "Jewellery", tag: "Web Development", category: "Web Development", text: "Jewellery", image: "images/logos/Miorah.png" },
+  { title: "YDU", overlay: "", tag: "Digital Marketing", category: "Digital Marketing", text: "", image: "images/logos/YDU.png" },
+  { title: "Gabby talk", overlay: "", tag: "Mobile App", category: "Mobile App", text: "", image: "images/logos/gabby_talk.png" },
+  { title: "Charmika", overlay: "Jewellery", tag: "Web Development", category: "Web Development", text: "Jewellery", image: "images/logos/Charmika.png" },
+  { title: "Le & Lee", overlay: "", tag: "Digital Marketing", category: "Digital Marketing", text: "", image: "images/logos/lee.png" },
 ];
 
-/* ───────── helpers ───────── */
-function useInView<T extends HTMLElement>(threshold = 0.2) {
+/* ---- Circular project wheel: pinned, scroll rotates the projects around a big ring ---- */
+function ProjectsWheel() {
+  const [filter, setFilter] = useState<Filter>("All Projects");
+  const [idx, setIdx] = useState(0);
+  const rootRef = useRef<HTMLElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLSpanElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null); // filters + project text (measured)
+  const counterRef = useRef<HTMLDivElement>(null); // bottom counter bar (measured)
+  const stRef = useRef<ScrollTrigger | null>(null);
+
+  const visible = filter === "All Projects" ? projects : projects.filter((p) => p.category === filter);
+  const countFor = (f: Filter) => (f === "All Projects" ? projects.length : projects.filter((p) => p.category === f).length);
+  const safeIdx = Math.min(idx, visible.length - 1);
+  const active = visible[safeIdx];
+
+  useEffect(() => {
+    const root = rootRef.current;
+    const ring = ringRef.current;
+    if (!root || !ring) return;
+
+    const cards = Array.from(root.querySelectorAll<HTMLElement>("[data-pw-card]"));
+    const n = cards.length;
+    if (!n) return;
+
+    const DEG = 180 / Math.PI;
+    const SCALE = 1.06; // scale of the front card
+    const ASPECT = 10 / 16; // card height / width
+    const proxy = { v: 0 };
+    let R = 600;
+    let step = 0.3;
+    let shown = -1;
+
+    /* Everything is derived from the real screen + the real text height, so the
+       wheel fits phones, tablets, laptops and landscape phones alike. */
+    const measure = () => {
+      const W = root.clientWidth;
+      const H = root.clientHeight;
+      const phone = W < 640;
+      const tablet = W >= 640 && W < 1024;
+
+      // 1. Vertical space between the text block and the counter bar
+      const info = infoRef.current;
+      const counter = counterRef.current;
+      const wrap = info?.offsetParent as HTMLElement | null;
+      const top = info ? (wrap?.offsetTop ?? 0) + info.offsetTop + info.offsetHeight + 16 : H * 0.4;
+      const bottom = counter ? counter.offsetTop - 16 : H - 48;
+      const avail = Math.max(bottom - top, 120);
+
+      // 2. Card width: by screen width, then shrunk if it would not fit the height
+      const base = phone ? clamp(W * 0.66, 180, 320) : tablet ? clamp(W * 0.4, 260, 380) : clamp(W * 0.26, 300, 440);
+      const cw = Math.max(120, Math.min(base, avail / (SCALE * ASPECT)));
+      const cardY = Math.round(top + avail / 2);
+
+      // 3. Ring radius from the spacing between cards (phones: tighter + gentler curve
+      //    so the neighbouring cards peek in from the sides)
+      const spacing = cw * (phone ? 0.8 : tablet ? 1.05 : 1.16);
+      const targetStep = phone ? 0.5 : tablet ? 0.42 : 0.36; // radians between cards
+      R = Math.max(spacing / targetStep, 240);
+      step = spacing / R;
+
+      gsap.set(cards, { top: cardY, width: cw, xPercent: -50, yPercent: -50 });
+      Object.assign(ring.style, {
+        width: `${R * 2}px`,
+        height: `${R * 2}px`,
+        left: `${W / 2 - R}px`,
+        top: `${cardY}px`,
+      });
+    };
+
+    const render = () => {
+      const v = proxy.v;
+      cards.forEach((el, i) => {
+        const d = i - v;
+        const ad = Math.abs(d);
+        const a = d * step;
+        gsap.set(el, {
+          x: R * Math.sin(a),
+          y: R * (1 - Math.cos(a)),
+          rotation: a * DEG,
+          scale: SCALE - Math.min(ad, 2) * 0.15,
+          autoAlpha: ad > 3 ? 0 : Math.max(0.18, 1 - ad * 0.32),
+          zIndex: Math.round(20 - ad * 3),
+        });
+      });
+      gsap.set(ring, { rotation: -v * step * DEG });
+      if (barRef.current) barRef.current.style.transform = `scaleX(${n > 1 ? v / (n - 1) : 1})`;
+      const i = Math.round(v);
+      if (i !== shown) {
+        shown = i;
+        setIdx(i);
+      }
+    };
+
+    const ctx = gsap.context(() => {
+      measure();
+      render();
+
+      if (n > 1) {
+        const H0 = 0.2;
+        const tl = gsap.timeline({
+          defaults: { ease: "none" },
+          scrollTrigger: {
+            trigger: root,
+            start: "top top",
+            end: () => `+=${Math.round(root.clientHeight * ((n - 1) * 0.7 + 0.4))}`,
+            pin: true,
+            scrub: 0.4,
+            anticipatePin: 1,
+            invalidateOnRefresh: true,
+          },
+        });
+        tl.to({}, { duration: H0 });
+        tl.to(proxy, { v: n - 1, duration: n - 1, onUpdate: render });
+        tl.to({}, { duration: H0 });
+        stRef.current = tl.scrollTrigger ?? null;
+      }
+    }, root);
+
+    // Re-measure whenever the section OR the text block changes size
+    // (rotation, resize, font load, longer title / description).
+    const ro = new ResizeObserver(() => {
+      measure();
+      render();
+    });
+    ro.observe(root);
+    if (infoRef.current) ro.observe(infoRef.current);
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (cancelled) return;
+      measure();
+      render();
+      ScrollTrigger.refresh();
+    });
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      ctx.revert();
+      stRef.current = null;
+    };
+  }, [filter]);
+
+  const goTo = (i: number) => {
+    const st = stRef.current;
+    if (!st || i === safeIdx) return;
+    const n = visible.length;
+    const frac = (0.2 + i) / (n - 1 + 0.4);
+    const y = st.start + (st.end - st.start) * frac;
+    if (lenisInstance) lenisInstance.scrollTo(y, { duration: 1.1 });
+    else window.scrollTo({ top: y, behavior: "smooth" });
+  };
+
+  const pick = (f: Filter) => {
+    if (f === filter) return;
+    const st = stRef.current;
+    if (st) {
+      if (lenisInstance) lenisInstance.scrollTo(st.start, { immediate: true });
+      else window.scrollTo(0, st.start);
+    }
+    setIdx(0);
+    setFilter(f);
+  };
+
+  return (
+    <section id="projects" ref={rootRef} className="relative h-[100svh] w-full overflow-hidden bg-black text-white">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_85%,rgba(118,171,174,.16),transparent_70%)]"
+      />
+
+      {/* ring the cards ride on */}
+      <div ref={ringRef} aria-hidden="true" className="pointer-events-none absolute">
+        <div className="absolute inset-0 rounded-full border border-white/15" />
+        <div className="absolute rounded-full border border-dashed border-white/10" style={{ inset: "-6%" }} />
+        <div className="absolute rounded-full border border-white/[0.07]" style={{ inset: "9%" }} />
+        {[0, 72, 144, 216, 288].map((a) => (
+          <span key={a} className="absolute inset-0" style={{ transform: `rotate(${a}deg)` }}>
+            <i className="absolute left-1/2 top-0 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#9fedf1]/80" />
+          </span>
+        ))}
+      </div>
+
+      {/* cards (size + position are set by GSAP; the width class is only a first-paint fallback) */}
+      {visible.map((p, i) => (
+        <div
+          key={p.title}
+          data-pw-card
+          role="button"
+          tabIndex={0}
+          aria-label={`Show ${p.title}`}
+          aria-current={i === safeIdx ? "true" : undefined}
+          onClick={() => goTo(i)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              goTo(i);
+            }
+          }}
+          className="absolute left-1/2 top-0 w-[66vw] cursor-pointer touch-manipulation outline-none focus-visible:[&>div]:ring-2 focus-visible:[&>div]:ring-[#9fedf1] sm:w-[40vw] lg:w-[26vw]"
+          style={{ opacity: 0 }}
+        >
+          <div className="relative aspect-[16/10] overflow-hidden rounded-xl border border-white/15 bg-[#141414] shadow-2xl shadow-black/60 sm:rounded-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.image} alt="" draggable={false} decoding="async" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-2.5 sm:p-4">
+              <span className="text-[9px] font-medium uppercase tracking-[0.18em] text-white/80 sm:text-xs">{p.category}</span>
+              <span className="font-display text-base text-white/90 sm:text-2xl">{String(i + 1).padStart(2, "0")}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* text + filters */}
+      <div className="pointer-events-none relative z-30 mx-auto flex h-full max-w-[88rem] flex-col px-5 pt-[clamp(4.5rem,12svh,7rem)] sm:px-10">
+        <div ref={infoRef}>
+          <div className="pointer-events-auto -mx-1 flex gap-x-6 overflow-x-auto px-1 [scrollbar-width:none] sm:gap-x-8 [&::-webkit-scrollbar]:hidden">
+            {filters.map((f) => (
+              <button
+                key={f}
+                onClick={() => pick(f)}
+                aria-pressed={filter === f}
+                className={`group relative shrink-0 py-2 text-sm font-medium transition-colors duration-300 ${
+                  filter === f ? "text-white" : "text-white/50 hover:text-white"
+                }`}
+              >
+                {f}
+                <sup className={`ml-1 text-xs ${filter === f ? "text-[#aaeff3]" : "text-white/40"}`}>{countFor(f)}</sup>
+                <span
+                  className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-[#9fedf1] transition-transform duration-500 ease-out ${
+                    filter === f ? "scale-x-100" : "scale-x-0 group-hover:scale-x-50"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+
+          <div key={active.title} aria-live="polite" className="mt-3 max-w-2xl sm:mt-6">
+            <div className="up flex items-center gap-3 text-xs" style={{ animationDelay: ".05s" }}>
+              <span className="rounded-full border border-[#76ABAE]/40 px-3 py-1 font-medium text-[#76ABAE]">{active.tag}</span>
+            </div>
+            <h2
+              className="up mt-2 truncate font-display text-[clamp(1.75rem,min(6vw,8svh),5rem)] font-bold leading-[1.05] tracking-tight sm:mt-3"
+              style={{ animationDelay: ".12s" }}
+            >
+              {active.title}
+            </h2>
+            {/* hidden on very short (landscape phone) screens */}
+            <p
+              className="up mt-3 line-clamp-2 min-h-[2.9em] max-w-xl text-sm leading-relaxed text-white/65 sm:line-clamp-3 sm:min-h-[4.4em] sm:text-base [@media(max-height:520px)]:hidden"
+              style={{ animationDelay: ".2s" }}
+            >
+              {active.text || `${active.category} project delivered by Empire AE.`}
+            </p>
+            <Link
+              href="/contact"
+              className="pointer-events-auto up group mt-3 inline-flex items-center gap-2 text-sm font-medium text-white transition-colors hover:text-[#9fedf1] sm:mt-4 sm:text-base"
+              style={{ animationDelay: ".3s" }}
+            >
+              Start a similar project
+              <ArrowUpRight size={18} className="transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* counter + progress */}
+      <div ref={counterRef} className="absolute inset-x-5 bottom-4 z-30 flex items-center gap-4 sm:inset-x-10 sm:bottom-5">
+        <span className="font-display text-sm tabular-nums text-white">
+          {String(safeIdx + 1).padStart(2, "0")}
+          <span className="text-white/40"> / {String(visible.length).padStart(2, "0")}</span>
+        </span>
+        <span className="relative h-px flex-1 bg-white/15">
+          <span ref={barRef} className="absolute inset-0 origin-left bg-[#dff3f4]" style={{ transform: "scaleX(0)" }} />
+        </span>
+        {visible.length > 1 && <span className="hidden text-xs uppercase tracking-[0.18em] text-white/45 sm:block">Scroll to rotate</span>}
+      </div>
+    </section>
+  );
+}
+
+/* ───────── scroll-reveal helpers (contact section) ───────── */
+function useInView<T extends HTMLElement>(threshold = 0.15) {
   const ref = useRef<T>(null);
   const [seen, setSeen] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { setSeen(true); io.disconnect(); }
-    }, { threshold });
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setSeen(true);
+          io.disconnect();
+        }
+      },
+      { threshold }
+    );
     io.observe(el);
     return () => io.disconnect();
   }, [threshold]);
@@ -73,372 +2401,961 @@ function Reveal({ children, delay = 0, className = "" }: { children: ReactNode; 
     <div
       ref={ref}
       style={{ transitionDelay: `${delay}ms` }}
-      className={`transition-all duration-1000 ease-[cubic-bezier(.2,.7,.2,1)] ${seen ? "translate-y-0 opacity-100 blur-0" : "translate-y-12 opacity-0 blur-md"} ${className}`}
+      className={`transition-all duration-1000 ease-[cubic-bezier(.2,.7,.2,1)] ${
+        seen ? "translate-y-0 opacity-100 blur-0" : "translate-y-12 opacity-0 blur-sm"
+      } ${className}`}
     >
       {children}
     </div>
   );
 }
 
-function CountUp({ end, suffix = "+" }: { end: number; suffix?: string }) {
-  const { ref, seen } = useInView<HTMLSpanElement>(0.5);
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (!seen) return;
-    const dur = 1500, t0 = performance.now();
-    let raf: number;
-    const tick = (t: number) => {
-      const p = Math.min((t - t0) / dur, 1);
-      setN(Math.round((1 - Math.pow(1 - p, 4)) * end));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [seen, end]);
-  return <span ref={ref}>{n}{suffix}</span>;
+function Rule() {
+  const { ref, seen } = useInView<HTMLDivElement>(0.5);
+  return <div ref={ref} className={`h-[3px] rounded-full bg-black transition-[width] delay-300 duration-1000 ease-out ${seen ? "w-14" : "w-0"}`} />;
 }
 
-const glass = "border border-[#76ABAE]/20 bg-[#EEEEEE]/[0.05] backdrop-blur-xl";
+/* ───────── contact information ───────── */
+const contactItems = [
+  { icon: Phone, label: "Phone", value: "+91 9847980605", href: "tel:+919847980605" },
+  { icon: Mail, label: "Email", value: "info@empireae.xyz", href: "mailto:info@empireae.xyz" },
+  { icon: Clock, label: "Response Time", value: "Within 24 hours", href: undefined as string | undefined },
+];
 
-const Tag = ({ children }: { children: ReactNode }) => (
-  <span className={`inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#EEEEEE] ${glass}`}>
-    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#76ABAE] shadow-[0_0_10px_#76ABAE]" />
-    {children}
-  </span>
-);
+const FACEBOOK_URL = "https://www.facebook.com/empireaeitservices";
+const INSTAGRAM_URL = "https://www.instagram.com/empire_ae_official/";
+const LINKEDIN_URL = "https://www.linkedin.com/company/empireaeitservices";
 
-const Btn = ({ href, children, ghost = false }: { href: string; children: ReactNode; ghost?: boolean }) => (
-  <Link
-    href={href}
-    className={`group relative inline-flex items-center gap-2 overflow-hidden rounded-full px-8 py-4 text-sm font-bold transition-all duration-300 hover:-translate-y-1 ${
-      ghost
-        ? `${glass} text-[#EEEEEE] hover:bg-[#EEEEEE]/10`
-        : "bg-[#76ABAE] text-[#222831] shadow-[0_10px_40px_-10px_rgba(118,171,174,.6)] hover:bg-[#EEEEEE] hover:shadow-[0_16px_50px_-8px_rgba(118,171,174,.8)]"
-    }`}
-  >
-    <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-[#EEEEEE]/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
-    <span className="relative">{children}</span>
-    {!ghost && <ArrowRight size={16} className="relative transition-transform group-hover:translate-x-1" />}
-  </Link>
-);
+const socialLink =
+  "inline-flex items-center justify-center whitespace-nowrap rounded-full border border-black/20 px-3.5 py-1.5 text-[13px] font-semibold text-black transition-all duration-300 hover:-translate-y-0.5 hover:border-black hover:bg-black hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black";
 
-/* ───────── page ───────── */
-export default function Home() {
-  const [active, setActive] = useState(0);
-  const [open, setOpen] = useState<number | null>(0);
-  const [showTop, setShowTop] = useState(false);
-  const tilt = useRef<HTMLDivElement>(null);
+const infoCard =
+  "group/info flex h-full min-w-0 items-center gap-4 rounded-2xl border border-black/10 bg-neutral-50 p-5 transition-all duration-300 hover:translate-x-1 hover:border-black hover:shadow-[0_18px_40px_-16px_rgba(0,0,0,.25)]";
+const infoIcon =
+  "grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-black text-white transition-transform duration-300 group-hover/info:-rotate-6";
+const infoLabel = "text-xs font-semibold uppercase tracking-[0.1em] text-black/50";
 
-  useEffect(() => {
-    const onScroll = () => setShowTop(scrollY > 400);
-    addEventListener("scroll", onScroll, { passive: true });
-    return () => removeEventListener("scroll", onScroll);
-  }, []);
-
-  const onTilt = (e: MouseEvent<HTMLDivElement>) => {
-    const el = tilt.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `perspective(1000px) rotateY(${x * 10}deg) rotateX(${-y * 10}deg)`;
-  };
-  const resetTilt = () => { if (tilt.current) tilt.current.style.transform = "perspective(1000px)"; };
-
+function ContactInfo() {
   return (
-    <main className="home-root relative overflow-x-clip bg-[linear-gradient(180deg,#31363F_0%,#222831_22%,#31363F_50%,#222831_78%,#222831_100%)] text-[#EEEEEE] selection:bg-[#76ABAE] selection:text-[#222831]">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Sans:wght@400;500;600;700&display=swap');
-        .home-root{font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif}
-        .home-root h1,.home-root h2,.home-root h3{font-family:'Bricolage Grotesque','DM Sans',ui-sans-serif,system-ui,sans-serif;letter-spacing:-0.035em}
-        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
-        @keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-        @keyframes up { from{opacity:0;transform:translateY(40px);filter:blur(8px)} to{opacity:1;transform:none;filter:blur(0)} }
-        @keyframes spin { to{transform:rotate(360deg)} }
-        @keyframes drift { 0%,100%{transform:translate(0,0)} 50%{transform:translate(50px,-40px)} }
-        @keyframes grad { to{background-position:200% center} }
-        .up{opacity:0;animation:up 1s cubic-bezier(.2,.7,.2,1) forwards}
-        .gtext{background:linear-gradient(100deg,#EEEEEE 0%,#76ABAE 30%,#EEEEEE 55%,#76ABAE 80%,#EEEEEE 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:grad 6s linear infinite}
-        .outline{color:transparent;-webkit-text-stroke:1.5px rgba(118,171,174,.7)}
-        .grid-bg{background-image:linear-gradient(rgba(118,171,174,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(118,171,174,.07) 1px,transparent 1px);background-size:56px 56px;-webkit-mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 40%,#000 20%,transparent 75%)}
-        .grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-        @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.up{opacity:1;filter:none}}
-      `}</style>
-      <div className="grain" />
-
-      {/* ───── HERO ───── */}
-      <section className="relative isolate flex min-h-screen items-center px-6 pb-20 pt-40">
-        <div className="absolute inset-0 -z-10 grid-bg" aria-hidden />
-        <div className="absolute left-[8%] top-1/3 -z-10 h-80 w-80 animate-[drift_16s_ease-in-out_infinite] rounded-full bg-[#76ABAE]/30 blur-[120px]" />
-        <div className="absolute bottom-10 right-[10%] -z-10 h-96 w-96 animate-[drift_20s_ease-in-out_infinite_reverse] rounded-full bg-[#EEEEEE]/10 blur-[130px]" />
-
-        <div className="mx-auto grid w-full max-w-7xl items-center gap-16 lg:grid-cols-[1.1fr_1fr]">
-          <div>
-            <div className="up"><Tag>Complete Digital Solutions</Tag></div>
-            <h1 className="up mt-8 text-6xl font-extrabold leading-[0.98] text-[#EEEEEE] sm:text-7xl xl:text-8xl" style={{ animationDelay: ".15s" }}>
-              Build.
-              <span className="outline block">Grow.</span>
-              <span className="gtext block">Dominate.</span>
-            </h1>
-            <p className="up mt-8 max-w-lg text-lg leading-relaxed text-[#EEEEEE]/70" style={{ animationDelay: ".3s" }}>
-              Empire AE is your end-to-end partner — from stunning websites and powerful
-              mobile apps to data-driven marketing strategies that grow your business.
-            </p>
-            <div className="up mt-10 flex flex-wrap items-center gap-4" style={{ animationDelay: ".45s" }}>
-              <Btn href="/contact">Get Started</Btn>
-              <Btn href="/services" ghost>Explore Services</Btn>
-            </div>
-          </div>
-
-          {/* tilt visual */}
-          <div className="up relative mx-auto w-full max-w-xl" style={{ animationDelay: ".4s" }} onMouseMove={onTilt} onMouseLeave={resetTilt}>
-            <div ref={tilt} className="relative transition-transform duration-200 ease-out [transform-style:preserve-3d]">
-              <div className={`overflow-hidden rounded-[2rem] p-2 shadow-2xl shadow-black/40 ${glass}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/hero.webp" alt="Modern office with team" className="aspect-[4/5] w-full rounded-[1.5rem] object-cover sm:aspect-[4/3]" />
-              </div>
-              <div className={`absolute -left-6 top-10 flex animate-[float_4s_ease-in-out_infinite] items-center gap-3 rounded-2xl px-4 py-3 shadow-xl [transform:translateZ(60px)] ${glass} bg-[#222831]/70`}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#aceef1]"><Zap size={18} /></span>
-                <div><p className="text-sm font-bold">Fast Delivery</p><p className="text-xs text-[#EEEEEE]/90">1–3 weeks</p></div>
-              </div>
-              <div className={`absolute -bottom-6 right-6 flex animate-[float_5s_ease-in-out_infinite_1s] items-center gap-3 rounded-2xl px-4 py-3 shadow-xl [transform:translateZ(80px)] ${glass} bg-[#222831]/70`}>
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#EEEEEE]"><CheckCircle2 size={18} /></span>
-                <div><p className="text-sm font-bold">9+ Years</p><p className="text-xs text-[#EEEEEE]/70">Of experience</p></div>
-              </div>
-            </div>
-
-            {/* rotating badge */}
-           
-<div>
-  <svg
-    viewBox="0 0 120 120"
-    className="absolute -right-6 -top-10 hidden h-28 w-28 animate-[spin_18s_linear_infinite] sm:block"
-    aria-hidden="true"
-  >
-    <defs>
-      <path
-        id="scroll-circle"
-        d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"
-      />
-    </defs>
-
-    <text
-      fontSize="10.5"
-      fontWeight="700"
-      letterSpacing="3.2"
-      fill="#EEEEEE"
+    <section
+      id="contact-info" data-nav-theme="light"
+      className="relative z-10 -mt-px rounded-t-[2rem] bg-white text-black shadow-[0_-40px_80px_-20px_rgba(0,0,0,.6)] sm:rounded-t-[3rem]"
     >
-      <textPath href="#scroll-circle" startOffset="0%">
-        SCROLL • EXPLORE • DISCOVER •
-      </textPath>
-    </text>
-
-    <circle cx="60" cy="60" r="6" fill="#76ABAE" />
-  </svg>
-</div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ───── MARQUEE ───── */}
-      <div className="overflow-hidden border-y border-[#76ABAE]/15 bg-[#31363F] py-6 [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]">
-        <div className="flex w-max animate-[marquee_40s_linear_infinite] hover:[animation-play-state:paused]">
-          {[...marqueeItems, ...marqueeItems].map((item, i) => (
-            <span key={i} className="outline flex items-center whitespace-nowrap text-3xl font-extrabold uppercase tracking-tight transition-all hover:!text-[#EEEEEE]">
-              <span className="px-8">{item}</span>
-              <span className="text-[#76ABAE] [-webkit-text-stroke:0]">✦</span>
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* ───── STATS ───── */}
-      <section className="mx-auto max-w-7xl px-6 py-24">
-        <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
-          {stats.map((s, i) => (
-            <Reveal key={s.label} delay={i * 120}>
-              <div className={`group rounded-3xl p-8 text-center transition-all duration-500 hover:-translate-y-2 hover:border-[#76ABAE]/50 hover:bg-[#76ABAE]/10 ${glass}`}>
-                <p className="text-5xl font-extrabold text-[#EEEEEE] drop-shadow-[0_0_30px_rgba(118,171,174,.55)]"><CountUp end={s.value} suffix={s.suffix} /></p>
-                <div className="mx-auto mt-4 h-px w-10 bg-[#76ABAE] transition-all duration-500 group-hover:w-24" />
-                <p className="mt-4 text-xs uppercase tracking-widest text-[#EEEEEE]/70">{s.label}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ───── ABOUT ───── */}
-      <section className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-20 lg:grid-cols-2">
-        <Reveal>
-          <div className="relative">
-            <div className="absolute -inset-4 rounded-[2.5rem] bg-gradient-to-br from-[#76ABAE]/30 to-transparent blur-2xl" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/about.webp" alt="Our team" className="relative aspect-[4/5] w-full rounded-[2rem] border border-[#76ABAE]/25 object-cover" />
-            <div className={`absolute -bottom-6 -right-2 flex animate-[float_5s_ease-in-out_infinite] items-center gap-3 rounded-2xl bg-[#222831]/80 px-5 py-4 shadow-2xl ${glass}`}>
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#76ABAE]"><Users size={20} /></span>
-              <div><p className="text-xl font-extrabold leading-none">50+</p><p className="text-xs text-[#EEEEEE]/70">Happy Clients</p></div>
-            </div>
-          </div>
-        </Reveal>
-
+      <div className="mx-auto grid max-w-[88rem] items-start gap-8 px-6 py-14 sm:px-10 lg:grid-cols-[.7fr_1.3fr] lg:gap-10 lg:py-20">
         <div>
-          <Reveal><Tag>About Us</Tag></Reveal>
-          <Reveal delay={100}><h2 className="mt-6 text-4xl font-extrabold text-[#EEEEEE] sm:text-5xl">Who <span className="gtext">We Are</span></h2></Reveal>
-          <Reveal delay={200}>
-            <p className="mt-6 text-lg leading-relaxed text-[#EEEEEE]">
-              Branding Empire AE is a full-service digital solutions company dedicated to helping businesses build, grow, and strengthen their digital presence.
+          <Reveal>
+            <h2 className="font-display text-4xl font-bold leading-[1.1] text-black sm:text-5xl">Contact Information</h2>
+          </Reveal>
+          <div className="mt-5">
+            <Rule />
+          </div>
+          <Reveal delay={150}>
+            <p className="mt-5 max-w-md text-base leading-relaxed text-black/70">
+              Ready to take your business to the next level? Reach out to our team and let&apos;s make it happen.
             </p>
-            <p className="mt-4 text-sm leading-relaxed text-[#EEEEEE]/70">
-              We specialize in website development, mobile app development, ERP solutions, digital marketing, and brand identity creation — end-to-end services under one roof. With over 9 years of industry experience, we bring deep expertise, proven strategies, and reliable solutions to every project.
-            </p>
-          </Reveal>
-          <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-            {checks.map((c, i) => (
-              <Reveal key={c} delay={300 + i * 100}>
-                <li className={`flex items-center gap-3 rounded-2xl p-4 text-sm font-medium transition-all hover:-translate-y-1 hover:border-[#76ABAE]/50 hover:bg-[#76ABAE]/10 ${glass}`}>
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#76ABAE] text-[#222831]"><Check size={13} /></span>
-                  {c}
-                </li>
-              </Reveal>
-            ))}
-          </ul>
-          <Reveal delay={700}><div className="mt-9"><Btn href="/about">Learn More About Us</Btn></div></Reveal>
-        </div>
-      </section>
-
-      {/* ───── SERVICES (expanding rows) ───── */}
-      <section id="services" className="mx-auto max-w-5xl px-6 py-28">
-        <div className="text-center">
-          <Reveal><Tag>Our Services</Tag></Reveal>
-          <Reveal delay={100}>
-            <h2 className="mt-6 text-4xl font-extrabold text-[#EEEEEE] sm:text-6xl">
-              Smart services for a <span className="gtext">smarter digital future.</span>
-            </h2>
-          </Reveal>
-          <Reveal delay={200}><p className="mx-auto mt-5 max-w-lg text-[#EEEEEE]/70">Everything you need to build, grow, and scale your digital presence — all under one roof.</p></Reveal>
-        </div>
-
-        <div className="mt-14 space-y-3">
-          {services.map(({ icon: Icon, title, text }, i) => {
-            const on = active === i;
-            return (
-              <Reveal key={title} delay={i * 80}>
-                <div
-                  onMouseEnter={() => setActive(i)}
-                  onClick={() => setActive(i)}
-                  className={`cursor-pointer rounded-3xl px-6 py-5 transition-all duration-500 sm:px-8 ${on ? "border border-[#76ABAE]/60 bg-[#76ABAE]/10 shadow-[0_0_50px_-20px_#76ABAE] backdrop-blur-xl" : glass}`}
-                >
-                  <div className="flex items-center gap-5">
-                    <span className="text-sm font-bold tabular-nums text-[#76ABAE]">0{i + 1}</span>
-                    <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl transition-all duration-500 ${on ? "rotate-6 bg-[#76ABAE] text-[#222831]" : "bg-[#76ABAE]/10 text-[#76ABAE]"}`}><Icon size={22} /></span>
-                    <h3 className="flex-1 text-xl font-bold text-[#EEEEEE] sm:text-2xl">{title}</h3>
-                    <span className={`grid h-10 w-10 place-items-center rounded-full border border-[#76ABAE]/30 transition-all duration-500 ${on ? "rotate-45 border-[#76ABAE] bg-[#76ABAE] text-[#222831]" : "text-[#76ABAE]"}`}><ArrowUpRight size={18} /></span>
-                  </div>
-                  <div className={`grid transition-all duration-500 ${on ? "grid-rows-[1fr] pt-4" : "grid-rows-[0fr]"}`}>
-                    <p className="overflow-hidden pl-0 text-sm leading-relaxed text-[#EEEEEE]/70 sm:pl-[5.5rem]">{text}</p>
-                  </div>
-                </div>
-              </Reveal>
-            );
-          })}
-        </div>
-        <Reveal className="mt-12 text-center"><Btn href="/services">View All Services</Btn></Reveal>
-      </section>
-
-      {/* ───── WHY + FAQ ───── */}
-      <section className="mx-auto grid max-w-7xl gap-16 px-6 py-24 lg:grid-cols-2">
-        <div>
-          <Reveal><Tag>Why Choose Us</Tag></Reveal>
-          <Reveal delay={100}>
-            <h2 className="mt-6 text-4xl font-extrabold leading-tight text-[#EEEEEE] sm:text-5xl">
-              Your Trusted <span className="gtext">Digital Partner</span>
-            </h2>
-          </Reveal>
-          <Reveal delay={200}>
-            <p className="mt-6 max-w-md text-[#EEEEEE]/70">
-              We place our clients at the center of everything we do, focusing on understanding their goals and delivering tailored solutions that create real value.
-            </p>
-            <div className={`mt-8 flex items-start gap-4 rounded-3xl p-6 ${glass}`}>
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#76ABAE]/20 text-[#76ABAE]"><ShieldCheck size={22} /></span>
-              <div>
-                <h3 className="font-bold text-[#EEEEEE]">Dedicated Post-Launch Support</h3>
-                <p className="mt-1 text-sm text-[#EEEEEE]/70">We stay with you after launch, providing ongoing monitoring and optimization.</p>
-              </div>
-            </div>
           </Reveal>
         </div>
 
-        <div className="space-y-4">
-          <Reveal><h3 className="mb-2 text-2xl font-bold text-[#EEEEEE]">Your Questions, <span className="text-[#76ABAE]">Answered</span></h3></Reveal>
-          {faqs.map((f, i) => (
-            <Reveal key={f.q} delay={i * 120}>
-              <div className={`rounded-2xl transition-all duration-300 ${open === i ? "border border-[#76ABAE]/60 bg-[#76ABAE]/10 backdrop-blur-xl" : glass}`}>
-                <button onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i} className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left text-sm font-semibold text-[#EEEEEE]">
-                  {f.q}
-                  <Plus size={18} className={`shrink-0 text-[#76ABAE] transition-transform duration-300 ${open === i ? "rotate-45" : ""}`} />
-                </button>
-                <div className={`grid transition-all duration-500 ${open === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
-                  <p className="overflow-hidden px-6 text-sm leading-relaxed text-[#EEEEEE]/70"><span className="block pb-5">{f.a}</span></p>
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          {contactItems.map(({ icon: Icon, label, value, href }, i) => (
+            <Reveal key={label} delay={200 + i * 80} className="h-full">
+              <div className={infoCard}>
+                <span className={infoIcon}>
+                  <Icon size={20} strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className={infoLabel}>{label}</h3>
+                  {href ? (
+                    <a href={href} className="mt-0.5 inline-block break-words text-base font-semibold text-black underline-offset-4 hover:underline sm:text-lg">
+                      {value}
+                    </a>
+                  ) : (
+                    <span className="mt-0.5 inline-block text-base font-semibold text-black sm:text-lg">{value}</span>
+                  )}
                 </div>
               </div>
             </Reveal>
           ))}
-        </div>
-      </section>
 
-      {/* ───── CTA ───── */}
-      <section id="contact" className="px-6 pb-24">
-        <Reveal>
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] p-px">
-            <div className="absolute inset-[-100%] animate-[spin_9s_linear_infinite] bg-[conic-gradient(from_0deg,transparent_0_60%,#76ABAE_85%,#EEEEEE_100%)]" />
-            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-[#31363F] to-[#222831] px-6 py-24 text-center">
-              <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-[#76ABAE]/25 blur-[100px]" />
-              <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-[#EEEEEE]/10 blur-[100px]" />
-              <div className="relative mx-auto max-w-2xl">
-                <Tag>Get Started Today</Tag>
-                <h2 className="mt-7 text-4xl font-extrabold text-[#EEEEEE] sm:text-6xl">
-                  Ready to <span className="gtext">Elevate Your Digital</span> Presence?
-                </h2>
-                <p className="mx-auto mt-5 max-w-md text-[#EEEEEE]/70">
-                  Join 50+ satisfied clients who trust Empire AE for their digital transformation journey.
-                </p>
-                <div className="mt-10 flex flex-wrap justify-center gap-4">
-                  <Btn href="/contact">Start Your Project</Btn>
-                  <a href="tel:+919847980605" className={`inline-flex items-center rounded-full px-8 py-4 text-sm font-bold text-[#EEEEEE] transition-all duration-300 hover:-translate-y-1 hover:bg-[#EEEEEE] hover:text-[#222831] ${glass}`}>
-                    Call Us Now
+          <Reveal delay={440} className="h-full">
+            <div className={infoCard}>
+              <span className={infoIcon}>
+                <Share2 size={20} strokeWidth={1.8} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className={infoLabel}>Follow Us</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on Facebook" className={socialLink}>
+                    Facebook
+                  </a>
+                  <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on Instagram" className={socialLink}>
+                    Instagram
+                  </a>
+                  <a href={LINKEDIN_URL} target="_blank" rel="noopener noreferrer" aria-label="Empire AE on LinkedIn" className={socialLink}>
+                    LinkedIn
                   </a>
                 </div>
               </div>
             </div>
-          </div>
-        </Reveal>
-      </section>
+          </Reveal>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-      {/* ───── Floating buttons ───── */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col items-center gap-3">
-        <Link href="https://wa.me/919847980605" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp"
-          className="relative grid h-14 w-14 place-items-center rounded-full bg-[#76ABAE] text-[#222831] shadow-[0_0_30px_-5px_#76ABAE] transition-all duration-300 hover:scale-110">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[#76ABAE]/40" />
-          <FaWhatsapp size={30} className="relative" />
-        </Link>
-        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top"
-          aria-hidden={!showTop} tabIndex={showTop ? 0 : -1}
-          className={`grid h-12 w-12 place-items-center rounded-full bg-[#EEEEEE] text-[#222831] shadow-xl transition-all duration-300 hover:scale-110 hover:bg-[#76ABAE] ${showTop ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
-          <ArrowUp size={22} />
-        </button>
+/* =====================================================================
+   WORDS SHOWCASE – Vision → Expertise → Success
+   Pinned "zoom-through tunnel": each word flies in from the distance,
+   holds at centre, then rushes past the camera as the next one appears.
+   ===================================================================== */
+type WordSlide = {
+  id: string;
+  word: string;
+  line: string;
+};
+
+const WORD_SLIDES: WordSlide[] = [
+  {
+    id: "vision",
+    word: "Vision",
+    line: "Imagining bold possibilities, shaping creative ideas, and envisioning a smarter digital future.",
+  },
+  {
+    id: "expertise",
+    word: "Expertise",
+    line: "Combining technology, creativity, and expertise to deliver innovative solutions that move businesses forward.",
+  },
+  {
+    id: "success",
+    word: "Success",
+    line: "Turning ideas into impact, challenges into opportunities, and ambitions into measurable digital growth.",
+  },
+];
+
+/** Splits a word into letters so each one can be animated. */
+function ShowWord({ text }: { text: string }) {
+  return (
+    <>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {Array.from(text).map((ch, i) => (
+          <span key={i} data-sw-ch className="sw-ch">
+            {ch}
+          </span>
+        ))}
+      </span>
+    </>
+  );
+}
+
+function WordsShowcase() {
+  const rootRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const mm = gsap.matchMedia(root);
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const slides = gsap.utils.toArray<HTMLElement>("[data-sw-slide]");
+      const rings = gsap.utils.toArray<HTMLElement>("[data-sw-ring]");
+      const counter = root.querySelector<HTMLElement>("[data-sw-counter]");
+      const bar = root.querySelector<HTMLElement>("[data-sw-bar]");
+      const n = slides.length;
+
+      const GAP = 2.0; // timeline units between the start of consecutive words
+      const total = (n - 1) * GAP + 2;
+
+      // distance each letter travels away from the centre while converging / leaving
+      const spread = (k: number) => (i: number, _el: Element, list: ArrayLike<Element>) =>
+        (i - (list.length - 1) / 2) * k;
+
+      const tl = gsap.timeline({
+        defaults: { ease: "none" },
+        scrollTrigger: {
+          trigger: root,
+          start: "top top",
+          // ~1.1 screens per word (was 1.5): same effect, no dead scrolling
+          end: () => `+=${window.innerHeight * n * 1.1}`,
+          pin: true,
+          scrub: 0.4,
+          anticipatePin: 1,
+          invalidateOnRefresh: true,
+        },
+      });
+
+      // Background rings expand for the whole scroll = constant "forward" motion
+      tl.fromTo(
+        rings,
+        { scale: 0.35 },
+        { scale: 2.6, duration: total, stagger: { each: total * 0.12, from: "start" }, ease: "none" },
+        0
+      );
+
+      // Progress line
+      if (bar) tl.fromTo(bar, { scaleY: 0 }, { scaleY: 1, duration: total, ease: "none" }, 0);
+
+      slides.forEach((slide, i) => {
+        const title = slide.querySelector<HTMLElement>("[data-sw-title]");
+        const chars = slide.querySelectorAll<HTMLElement>("[data-sw-ch]");
+        const line = slide.querySelector<HTMLElement>("[data-sw-line]");
+        const t = i * GAP;
+
+        // ── ENTER: emerges from the distance, letters converge ──
+        // (blur radii are kept small: big blurs on huge text are expensive)
+        tl.fromTo(
+          title,
+          { scale: 0.25, opacity: 0, filter: "blur(10px)" },
+          { scale: 1, opacity: 1, filter: "blur(0px)", duration: 1.2, ease: "power2.out" },
+          t
+        );
+        tl.fromTo(chars, { x: spread(70) }, { x: 0, duration: 1.2, ease: "power3.out" }, t);
+        tl.fromTo(
+          line,
+          { opacity: 0, y: 40, filter: "blur(4px)" },
+          { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.8, ease: "power2.out" },
+          t + 0.7
+        );
+
+        // ── EXIT: rushes past the camera (last word stays until unpin) ──
+        if (i < n - 1) {
+          const out = t + 1.5;
+          tl.to(line, { opacity: 0, y: -30, filter: "blur(4px)", duration: 0.5, ease: "power1.in" }, out);
+          tl.to(title, { scale: 4.5, opacity: 0, filter: "blur(12px)", duration: 1, ease: "power2.in" }, out);
+          tl.to(chars, { x: spread(120), duration: 1, ease: "power2.in" }, out);
+
+          // roll the counter to the next number (inner column is n lines tall)
+          if (counter) {
+            tl.to(counter, { yPercent: -((i + 1) / n) * 100, duration: 0.6, ease: "power2.inOut" }, out + 0.4);
+          }
+        }
+      });
+
+      tl.to({}, { duration: 0.2 }); // small hold on the last word
+    });
+
+    return () => mm.revert();
+  }, []);
+
+  return (
+    <section ref={rootRef} className="sw-section" aria-label="What we do">
+      <style>{SW_CSS}</style>
+
+      {/* tunnel rings */}
+      <div className="sw-rings" aria-hidden="true">
+        {[0, 1, 2, 3].map((r) => (
+          <span key={r} data-sw-ring className="sw-ring" />
+        ))}
+      </div>
+
+      {/* counter + progress */}
+      <div className="sw-hud" aria-hidden="true">
+        <div className="sw-count">
+          <span className="sw-count-win">
+            <span data-sw-counter className="sw-count-inner">
+              {WORD_SLIDES.map((s, i) => (
+                <span key={s.id}>{String(i + 1).padStart(2, "0")}</span>
+              ))}
+            </span>
+          </span>
+          <span className="sw-count-total">/ {String(WORD_SLIDES.length).padStart(2, "0")}</span>
+        </div>
+        <span className="sw-track">
+          <span data-sw-bar className="sw-bar" />
+        </span>
+      </div>
+
+      {WORD_SLIDES.map((s) => (
+        <div key={s.id} data-sw-slide className="sw-slide">
+          <div className="sw-text">
+            <div role="heading" aria-level={2} data-sw-title className="sw-title">
+              <ShowWord text={s.word} />
+            </div>
+            <p data-sw-line className="sw-line">
+              {s.line}
+            </p>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/* =====================================================================
+   6. STYLES
+   ===================================================================== */
+
+/* Global / hero styles */
+const HOME_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+.home-root{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.home-root h1,.home-root h2,.home-root h3{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;letter-spacing:-0.03em}
+.home-root h1.hero-title{font-weight:300;letter-spacing:-0.02em}
+.home-root .font-display{font-family:'Inter',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif}
+.home-root h2.font-display{letter-spacing:-0.025em}
+@keyframes up { from{opacity:0;transform:translateY(40px);filter:blur(8px)} to{opacity:1;transform:none;filter:blur(0)} }
+@keyframes rowIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+@keyframes grad { to{background-position:200% center} }
+.up{opacity:0;animation:up 1s cubic-bezier(.2,.7,.2,1) forwards}
+.row-in{animation:rowIn .6s cubic-bezier(.2,.8,.2,1) both}
+.gtext{background:linear-gradient(100deg,#EEEEEE 0%,#76ABAE 30%,#EEEEEE 55%,#76ABAE 80%,#EEEEEE 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:grad 6s linear infinite}
+.gtext-white{background:linear-gradient(100deg,#FFFFFF 0%,#B8B8B8 30%,#FFFFFF 55%,#B8B8B8 80%,#FFFFFF 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:grad 6s linear infinite}
+.grain::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}.up{opacity:1;filter:none}}
+`;
+
+/* Scroll text reveal + brand showcase + testimonials (scoped with "eae-") */
+const EAE_CSS = `
+/* Scroll text reveal.
+   The section is exactly one screen tall; ScrollTrigger pins it (see
+   ScrollTextReveal) and adds just enough scroll distance for the reveal. */
+.eae-reveal-wrap { background: #000000; } /* keeps the pin spacer black */
+.eae-reveal {
+  position: relative;
+  background: #000000;
+}
+/* Only as tall as the text plus modest padding: this padding is the ONLY
+   black space above/below the paragraph. */
+.eae-reveal-sticky {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  padding: clamp(40px, 10svh, 112px) clamp(20px, 6vw, 96px);
+  box-sizing: border-box;
+}
+.eae-reveal-text {
+  margin: 0;
+  width: 100%;
+  max-width: 1240px;
+  text-align: left;
+  font-family: inherit;
+  font-weight: 300;
+  font-size: clamp(24px, 3.2vw, 48px);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+/* Keeps each word intact so lines break between words only */
+.eae-word { display: inline-block; white-space: nowrap; }
+.eae-char { color: #555555; }
+.eae-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 1024px) {
+  .eae-reveal-text { font-size: clamp(22px, 4vw, 36px); }
+}
+@media (max-width: 640px) {
+  .eae-reveal-text {
+    font-size: clamp(20px, 5.6vw, 28px);
+    line-height: 1.22;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .eae-reveal { height: auto; }
+  .eae-reveal-sticky {
+    position: relative;
+    height: auto;
+    min-height: 100svh;
+    padding-top: 80px;
+    padding-bottom: 80px;
+  }
+}
+
+/* Testimonials section background: shares LIGHT.bg with the showcase theme.
+   min-height is only ~75% of the screen (the engage band in isReviewsEngaged()
+   needs at least 40%), so the review sits tight with no big blank bands. */
+.eae-showcase {
+  background: ${THEME_LIGHT.bg};
+  position: relative;
+  isolation: isolate;
+  color: #d7f1f7;
+  padding: clamp(32px, 4vw, 64px) 0 clamp(32px, 4vw, 64px);
+  overflow-x: clip;
+  font-family: inherit;
+  box-sizing: border-box;
+  min-height: 75vh;
+  min-height: 75svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Brand showcase: six clipped slots, logos swap with a staggered slide.
+   --bs-bg / --bs-fg default to the black theme so the very first paint is
+   correct. The scroll trigger toggles .is-light (binary, never animated). */
+.eae-bs {
+  --bs-bg: ${THEME_DARK.bg};
+  --bs-fg: ${THEME_DARK.fg};
+  --bs-fs: clamp(18px, 2.3vw, 40px); /* base logo size, everything scales from it */
+  --bs-h: clamp(56px, 5.6vw, 96px);  /* slot height */
+  background: var(--bs-bg);
+  color: var(--bs-fg);
+  padding: clamp(20px, 2.5vw, 36px) clamp(16px, 2vw, 32px) clamp(24px, 3vw, 48px);
+  font-family: inherit;
+  overflow: hidden;
+}
+/* Binary light state: toggled by the scroll trigger, never animated */
+.eae-bs.is-light {
+  --bs-bg: ${THEME_LIGHT.bg};
+  --bs-fg: ${THEME_LIGHT.fg};
+}
+.eae-bs-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 clamp(24px, 4vw, 64px);
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: var(--bs-fg);
+}
+.eae-bs-brace {
+  font-size: 2.6em;
+  font-weight: 200;
+  line-height: 0.7;
+  transform: scaleX(0.7);
+}
+.eae-bs-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 32px);
+}
+.eae-bs-slot {
+  position: relative;
+  height: var(--bs-h);
+  overflow: hidden; /* each logo is clipped to its own slot */
+}
+.eae-bs-logo {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  visibility: hidden; /* GSAP reveals each logo with autoAlpha */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.eae-bs-logo.is-active { visibility: visible; opacity: 1; }
+
+/* Text-based logo marks. Swap in real SVGs through the "src" field in BRAND_GROUPS. */
+.eae-mk {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--bs-fs);
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--bs-fg);
+}
+.eae-bs-mask {
+  display: block;
+  width: calc(var(--bs-fs) * 4);
+  height: calc(var(--bs-fs) * 1.2);
+  background: var(--bs-fg);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: left center; mask-position: left center;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+  .eae-bs-brand-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+  user-select: none;
+  pointer-events: none;
+  transform: scale(var(--bs-logo-scale, 1));
+  transform-origin: left center;
+}
+/* Theme-coloured logos: the PNG's alpha channel is the shape, --bs-fg the colour */
+.eae-bs-brand-theme {
+  background-color: var(--bs-fg);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: left center; mask-position: left center;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+.eae-mk-intel { font-weight: 700; letter-spacing: -0.05em; font-size: calc(var(--bs-fs) * 1.1); }
+.eae-mk-youtube, .eae-mk-yt { font-weight: 700; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 0.85); }
+.eae-mk-yt-box {
+  margin-left: 0.12em;
+  padding: 0.1em 0.22em;
+  border-radius: 0.28em;
+  background: var(--bs-fg);
+  color: var(--bs-bg);
+}
+.eae-mk-netflix { font-weight: 800; letter-spacing: 0.02em; font-size: calc(var(--bs-fs) * 0.8); }
+.eae-mk-amz { flex-direction: column; align-items: flex-start; gap: 0; font-weight: 700; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 1); }
+.eae-mk-amz i {
+  display: block;
+  width: 70%;
+  height: 0.3em;
+  margin: -0.08em 0 0 0.35em;
+  border-bottom: 0.09em solid var(--bs-fg);
+  border-radius: 0 0 60% 60%;
+}
+.eae-mk-ford {
+  padding: 0.1em 0.7em 0.16em;
+  border: 0.07em solid var(--bs-fg);
+  border-radius: 50%;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: calc(var(--bs-fs) * 0.8);
+}
+.eae-mk-samsung {
+  padding: 0.35em 1em;
+  border-radius: 50%;
+  background: var(--bs-fg);
+  color: var(--bs-bg);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-size: calc(var(--bs-fs) * 0.5);
+}
+.eae-mk-ea { flex-direction: column; align-items: flex-start; font-style: italic; font-weight: 800; font-size: calc(var(--bs-fs) * 0.95); }
+.eae-mk-ea small { font-size: 0.34em; font-style: normal; font-weight: 600; letter-spacing: 0.08em; margin-top: 0.15em; }
+.eae-mk-nike { font-style: italic; font-weight: 900; letter-spacing: -0.04em; font-size: calc(var(--bs-fs) * 0.9); }
+.eae-mk-aol { font-weight: 800; letter-spacing: -0.02em; font-size: calc(var(--bs-fs) * 1); }
+.eae-mk-gucci { font-family: Georgia, "Times New Roman", serif; font-weight: 300; letter-spacing: 0.03em; font-size: calc(var(--bs-fs) * 0.95); }
+.eae-mk-mcd svg {
+  width: calc(var(--bs-fs) * 0.95);
+  height: calc(var(--bs-fs) * 0.8);
+  fill: none;
+  stroke: var(--bs-fg);
+  stroke-width: 3.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+.eae-mk-ms { gap: 0.25em; font-weight: 500; font-size: calc(var(--bs-fs) * 0.72); }
+.eae-mk-ms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.09em;
+  width: 1.15em;
+  height: 1.15em;
+}
+.eae-mk-ms-grid b { display: block; background: var(--bs-fg); }
+
+/* Tablet and phone: same six slots, laid out as 3 x 2 so nothing overflows */
+@media (max-width: 900px) {
+  .eae-bs { --bs-fs: clamp(20px, 5.2vw, 34px); --bs-h: clamp(56px, 12vw, 84px); }
+  .eae-bs-row { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: clamp(8px, 3vw, 24px); }
+}
+
+/* Reduced motion: the first group stays put, nothing animates */
+@media (prefers-reduced-motion: reduce) {
+  .eae-bs-logo { transition: none; }
+}
+
+/* Testimonials */
+.eae-container {
+  position: relative;
+  z-index: 1; /* review content stays above the reveal layer */
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 40px) clamp(20px, 5vw, 48px) 0;
+  box-sizing: border-box;
+}
+.eae-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: clamp(24px, 3.5vw, 48px);
+}
+.eae-heading {
+  margin: 0;
+  font-size: clamp(30px, 4.2vw, 52px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: #000000;
+}
+.eae-controls { display: flex; gap: 12px; flex-shrink: 0; }
+.eae-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: #000000;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+.eae-arrow:hover { background: #3d3d3d; transform: scale(1.06); }
+.eae-arrow:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
+
+.eae-content {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(32px, 6vw, 96px);
+  align-items: start;
+  min-height: 280px;
+}
+.eae-person { display: flex; align-items: center; gap: 20px; }
+.eae-avatar {
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #000000;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  overflow: hidden;
+}
+.eae-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eae-name { margin: 0; font-size: 20px; font-weight: 600; color: #444141; }
+.eae-meta { margin: 4px 0 0; font-size: 16px; line-height: 1.4; color: #4b4545; }
+.eae-quote {
+  margin: 0;
+  max-width: 680px;
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 400;
+  line-height: 1.4;
+  color: #292626;
+  text-align: left;
+}
+/* Mouse-reveal layer: behind the review content, transparent until revealed */
+.eae-rv-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Review stage: stationary, clipped, all slides share one grid cell */
+.eae-viewport {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+}
+.eae-slide {
+  grid-area: 1 / 1;
+  min-width: 0;
+  visibility: hidden; /* GSAP reveals slides with autoAlpha */
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.eae-slide--initial { visibility: visible; opacity: 1; } /* first review: visible on first paint */
+.eae-arrow:disabled { opacity: 0.35; cursor: default; }
+.eae-arrow:disabled:hover { background: #000000; transform: none; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .eae-content { grid-template-columns: 1fr; min-height: 0; gap: 24px; }
+}
+@media (max-width: 640px) {
+  .eae-header { align-items: flex-start; gap: 16px; }
+  .eae-person { gap: 16px; }
+  .eae-arrow { width: 44px; height: 44px; }
+  .eae-avatar { width: 64px; height: 64px; font-size: 20px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .eae-arrow { transition: none; }
+}
+`;
+
+/* Services artwork animation */
+const FW_CSS = `
+@keyframes fw-drift-a { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(4%,-5%,0) scale(1.06); } }
+@keyframes fw-drift-b { 0%,100% { transform: translate3d(0,0,0) rotate(0deg); } 50% { transform: translate3d(-5%,4%,0) rotate(8deg); } }
+.fw-drift-a { animation: fw-drift-a 14s ease-in-out infinite; }
+.fw-drift-b { animation: fw-drift-b 18s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .fw-drift-a, .fw-drift-b { animation: none; } }
+`;
+
+/* Words showcase (Vision / Expertise / Success) – zoom-through tunnel, scoped with "sw-" */
+const SW_CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
+.sw-section {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: 'Inter', ui-sans-serif, system-ui, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* tunnel rings */
+.sw-rings {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.sw-ring {
+  grid-area: 1 / 1;
+  width: min(70vw, 70svh);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(159, 237, 241, 0.18);
+  box-shadow: 0 0 60px rgba(118, 171, 174, 0.08) inset;
+  will-change: transform;
+}
+
+/* slides stacked in the centre */
+.sw-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 clamp(20px, 6vw, 96px);
+  will-change: transform, opacity;
+}
+.sw-text {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sw-title {
+  font-size: clamp(52px, min(15vw, 30svh), 260px);
+  font-weight: 200;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  transform-origin: 50% 50%;
+  will-change: transform, filter, opacity;
+}
+.sw-ch { display: inline-block; will-change: transform; }
+
+.sw-line {
+  margin: clamp(16px, 3vh, 40px) 0 0;
+  max-width: 44ch;
+  font-size: clamp(14px, 1.5vw, 22px);
+  font-weight: 300;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.85);
+  will-change: transform, filter, opacity;
+}
+
+/* HUD: odometer counter + progress line */
+.sw-hud {
+  position: absolute;
+  z-index: 2;
+  right: clamp(16px, 3vw, 48px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.sw-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(12px, 1vw, 14px);
+  letter-spacing: 0.12em;
+  line-height: 1.2em;
+  color: #fff;
+}
+/* window shows exactly one number; the inner column (3 lines tall) is rolled by GSAP */
+.sw-count-win { display: block; height: 1.2em; overflow: hidden; }
+.sw-count-inner { display: flex; flex-direction: column; will-change: transform; }
+.sw-count-inner span { display: block; height: 1.2em; line-height: 1.2em; }
+.sw-count-total { color: rgba(255, 255, 255, 0.4); }
+.sw-track {
+  position: relative;
+  width: 1px;
+  height: clamp(60px, 12vh, 120px);
+  background: rgba(255, 255, 255, 0.18);
+}
+.sw-bar {
+  position: absolute;
+  inset: 0;
+  background: #9fedf1;
+  transform-origin: top;
+  transform: scaleY(0);
+}
+
+@media (max-width: 640px) {
+  .sw-title { font-size: clamp(44px, min(21vw, 26svh), 120px); }
+  .sw-hud { right: 12px; top: auto; bottom: 20px; transform: none; flex-direction: row-reverse; }
+  .sw-track { width: clamp(40px, 14vw, 80px); height: 1px; }
+  .sw-bar { transform-origin: left; transform: scaleX(0); }
+}
+
+/* reduced motion: no pinning, every word stacked */
+@media (prefers-reduced-motion: reduce) {
+  .sw-section { height: auto; overflow: visible; }
+  .sw-slide { position: relative; min-height: 100svh; }
+  .sw-rings, .sw-hud { display: none; }
+}
+`;
+
+/* =====================================================================
+   7. PAGE (default export)
+   ===================================================================== */
+const RESPONSIVE_CSS = `
+/* Responsive safeguards: preserve the original animation systems, fix layout only.
+   NOTE: the Projects wheel (#projects) is sized by JS in ProjectsWheel(), so
+   there are intentionally no card/width/padding overrides for it here.
+   NOTE: .eae-reveal heights live ONLY in EAE_CSS (one source of truth). */
+.home-root { width: 100%; max-width: 100%; overflow-x: clip; }
+.home-root *, .home-root *::before, .home-root *::after { box-sizing: border-box; }
+.home-root img, .home-root video, .home-root svg { max-width: 100%; }
+.home-root a, .home-root button { -webkit-tap-highlight-color: transparent; }
+.home-root button, .home-root a { touch-action: manipulation; }
+.home-root :focus-visible { outline: 2px solid #9fedf1; outline-offset: 4px; }
+
+.eae-reveal-sticky { padding-inline: clamp(1.1rem, 6vw, 6rem); }
+.eae-reveal-text { overflow-wrap: anywhere; }
+.eae-bs { width: 100%; min-width: 0; }
+.eae-bs-row { width: 100%; }
+.eae-bs-slot { min-width: 0; }
+.eae-reviews, .eae-reviews * { min-width: 0; }
+.eae-reveal, .eae-bs, .eae-reviews, #services, #projects, #contact-info { max-width: 100%; }
+
+#services { scroll-margin-top: 1rem; }
+#services ul { width: min(100%, 88rem); }
+#services li { min-width: 0; }
+#services [data-fw-tilt] { transform-style: preserve-3d; }
+#projects { isolation: isolate; }
+#contact-info a { overflow-wrap: anywhere; }
+
+@media (max-width: 767px) {
+  .home-root { overflow-x: clip; }
+  .home-root h1, .home-root h2, .home-root h3 { overflow-wrap: anywhere; }
+  .home-root section { scroll-margin-top: 0; }
+  .eae-reveal-sticky { padding: 3rem 1.25rem; }
+  .eae-reveal-text { font-size: clamp(1.3rem, 5.6vw, 2rem); line-height: 1.25; letter-spacing: -0.035em; }
+  .eae-bs { padding-inline: 1rem; }
+  .eae-bs-row { gap: .5rem; }
+  .eae-bs-slot { overflow: hidden; }
+  .eae-bs .eae-mk { max-width: 100%; font-size: clamp(.8rem, 3.2vw, 1.3rem); }
+  .eae-reviews { padding-inline: 1rem; }
+  #services { padding-inline: 1rem; }
+  #services header { align-items: flex-start; }
+  #services ul { grid-template-columns: minmax(0, 1fr); }
+  #services ul > li:nth-child(even) { margin-top: 0; }
+  #contact-info { border-top-left-radius: 1.5rem; border-top-right-radius: 1.5rem; }
+  #contact-info > div { padding: 3rem 1.25rem; gap: 1.75rem; }
+  #contact-info .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 479px) {
+  .home-root section { min-width: 0; }
+  .home-root .hero-title { font-size: clamp(2rem, 10vw, 2.75rem); line-height: 1.08; }
+  .home-root section:first-of-type { min-height: 620px; }
+  .home-root section:first-of-type > div.mx-auto { padding-inline: 1.25rem; padding-bottom: 8.5rem; }
+  .home-root section:first-of-type > button[aria-label="Scroll down"] { bottom: .75rem; }
+  .home-root section:first-of-type > button[aria-label="Mute video"], 
+  .home-root section:first-of-type > button[aria-label="Unmute video"] { right: 1rem; bottom: 4.4rem; }
+  .eae-reveal-text { font-size: clamp(1.25rem, 5.8vw, 1.6rem); }
+  #contact-info .text-4xl { font-size: 2rem; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  #services { padding-inline: 1.5rem; }
+  #contact-info > div { gap: 2rem; padding-inline: 2rem; }
+}
+
+@media (hover: none), (pointer: coarse) {
+  #services [data-fw-tilt] { transform: none !important; }
+  #services [data-fw-cursor] { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-root *, .home-root *::before, .home-root *::after {
+    scroll-behavior: auto !important;
+  }
+}
+`;
+
+export default function Home() {
+  // One global Lenis instance driven by GSAP's ticker (smooth scroll + ScrollTrigger sync).
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const lenis = new Lenis({
+      autoRaf: false,
+      anchors: true,
+      syncTouch: false, // keep native touch scrolling on phones (smoother, no lag)
+      // Lenis steps aside ONLY while the client-reviews stage owns wheel/touch.
+      // Everywhere else (including the rest of that section) scrolling stays smooth.
+      prevent: (node) => {
+        const section = node.closest(".eae-showcase");
+        return !!section && isReviewsEngaged(section);
+      },
+    });
+    lenisInstance = lenis;
+    lenis.on("scroll", ScrollTrigger.update);
+    const tick = (time: number) => lenis.raf(time * 1000);
+    gsap.ticker.add(tick);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(tick);
+      gsap.ticker.lagSmoothing(500, 33);
+      lenis.destroy();
+      lenisInstance = null;
+    };
+  }, []);
+
+  return (
+    <main className="home-root relative overflow-x-clip bg-[linear-gradient(180deg,#31363F_0%,#222831_22%,#31363F_50%,#222831_78%,#222831_100%)] text-[#EEEEEE] selection:bg-[#b4edf0] selection:text-[#222831]">
+      <style>{HOME_CSS}</style>
+      <style dangerouslySetInnerHTML={{ __html: EAE_CSS }} />
+      <style>{FW_CSS}</style>
+      <style>{RESPONSIVE_CSS}</style>
+      <div className="grain" />
+
+      {/* 1. HERO (video) */}
+      <VideoHero />
+
+      {/* 2. SCROLL TEXT REVEAL */}
+      <ScrollTextReveal />
+
+      {/* 3. BRAND SHOWCASE (black -> white) + CLIENT REVIEWS */}
+      <BrandShowcase groups={BRAND_GROUPS} />
+      <ClientTestimonials items={TESTIMONIALS} />
+
+      {/* 4. WORDS SHOWCASE (Vision / Expertise / Success) */}
+      <WordsShowcase />
+
+      {/* 5. SERVICES */}
+      <ServicesSection />
+
+      {/* 6. PROJECTS (circular wheel, pinned) + CONTACT INFO */}
+      <div className="relative bg-black">
+        <ProjectsWheel />
+        <ContactInfo />
       </div>
     </main>
   );
 }
-
-=======
-export default function Home() {
-    return (
-        <main>
-            <h1>Empire Website</h1>
-            <p>Welcome to our website.</p>
-        </main>
-    );
-}
->>>>>>> 4485c41 (services Page , new header, team page)

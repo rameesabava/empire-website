@@ -1,612 +1,274 @@
 "use client";
 
-import Link from "next/link";
-import emailjs from "@emailjs/browser";
+/* =====================================================================
+   Empire: Contact page (single file) with EmailJS
+   Save as: app/contact/page.tsx
+   ---------------------------------------------------------------------
+   Install once:   npm install @emailjs/browser
+   Create .env.local in the project root (restart the dev server after):
+
+     NEXT_PUBLIC_EMAILJS_SERVICE_ID=service_xxxxxxx
+     NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=template_xxxxxxx
+     NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=xxxxxxxxxxxxxxxx
+
+   EmailJS template variables used (put these in your template):
+     {{from_name}}  {{from_email}}  {{reply_to}}  {{phone}}
+     {{company}}    {{service}}     {{message}}
+
+   Optional: to use a downloaded animated icon (GIF / WebP / PNG from
+   Flaticon) on the success screen, put it in /public and set
+   SUCCESS_ICON_SRC below, for example "/images/message-sent.gif".
+   ===================================================================== */
+
 import {
   useEffect,
+  useId,
+  useLayoutEffect,
   useRef,
   useState,
-  type ChangeEvent,
-  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import emailjs from "@emailjs/browser";
 
-/* -------------------------------------------------------------------------- */
-/*  Content (same as the original Contact page)                               */
-/*  Palette: #222831 · #31363F · #76ABAE · #EEEEEE                            */
-/* -------------------------------------------------------------------------- */
+// Runs before paint in the browser (no flash of un-animated text), safe during SSR.
+const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/**
- * EmailJS settings - add these to .env.local (then restart `npm run dev`):
- * NEXT_PUBLIC_EMAILJS_SERVICE_ID=service_xxxxxxx
- * NEXT_PUBLIC_EMAILJS_TEMPLATE_ID=template_xxxxxxx
- * NEXT_PUBLIC_EMAILJS_PUBLIC_KEY=your_public_key
- */
-const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID ?? "";
-const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID ?? "";
-const EMAILJS_PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY ?? "";
+/* =====================================================================
+   1. CONFIG
+   ===================================================================== */
 
-const SERVICES = [
-  "Web Designing",
-  "Web Development",
-  "Mobile App Development",
-  "Digital Marketing",
-  "E-Commerce Solution",
-  "Hosting & Domain",
-  "SEO",
-  "Software Application",
-  "Other",
-];
+const OFFICE_ADDRESS =
+  "Empire Ae IT Services, Transasia Cyber Park, Infopark Phase 2, Kochi, Kerala 682303, India";
 
-const STEPS = [
-  {
-    n: "01",
-    title: "Initial Consultation",
-    text: "We respond within 24 hours to schedule a free consultation call to understand your requirements.",
-    icon: <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />,
-  },
-  {
-    n: "02",
-    title: "Proposal & Strategy",
-    text: "We provide a detailed project proposal outlining the scope, timeline, and strategy tailored for you.",
-    icon: (
-      <>
-        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
-        <path d="M14 2v5h5" />
-        <path d="M9 13h6M9 17h6" />
-      </>
-    ),
-  },
-  {
-    n: "03",
-    title: "Project Kickoff",
-    text: "Once approved, our team gets to work immediately, keeping you updated at every milestone.",
-    icon: (
-      <>
-        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-        <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
-        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
-      </>
-    ),
-  },
-];
-
-const ICONS = {
-  phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />,
-  mail: (
-    <>
-      <rect width="20" height="16" x="2" y="4" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-    </>
-  ),
-  clock: (
-    <>
-      <circle cx="12" cy="12" r="10" />
-      <path d="M12 6v6l4 2" />
-    </>
-  ),
-  share: (
-    <>
-      <circle cx="18" cy="5" r="3" />
-      <circle cx="6" cy="12" r="3" />
-      <circle cx="18" cy="19" r="3" />
-      <path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98" />
-    </>
-  ),
-  send: (
-    <>
-      <path d="m22 2-7 20-4-9-9-4z" />
-      <path d="M22 2 11 13" />
-    </>
-  ),
+const COMPANY: {
+  address: string;
+  mapQuery: string;
+  coordinates: { lat: number; lng: number } | null;
+} = {
+  address: OFFICE_ADDRESS,
+  mapQuery: OFFICE_ADDRESS,
+  coordinates: null,
 };
 
-/* -------------------------------------------------------------------------- */
-/*  Styles (same design system as the About page, plus contact-specific)      */
-/* -------------------------------------------------------------------------- */
+// NEXT_PUBLIC_ variables must be written out in full so Next.js can inline them.
+const EMAILJS = {
+  serviceId: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+  templateId: process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
+  publicKey: process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY,
+};
 
-const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Sans:wght@400;500;600;700&display=swap');
+// Optional downloaded animated icon (GIF/WebP/PNG in /public). null = built-in animated SVG.
+const SUCCESS_ICON_SRC: string | null = null;
 
-.bd-root {
-  --ink: #222831; --deep: #31363F; --abyss: #1D2229;
-  --cyan: #76ABAE; --cyan-3: #9CC5C8; --pale: #B9D6D8;
-  --mist: #B3B8BD; --snow: #EEEEEE; --slate: #5C6676;
-  background: var(--ink); color: var(--snow);
-  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif; line-height: 1.6;
-  -webkit-font-smoothing: antialiased; overflow-x: clip;
-}
-.bd-root p { color: var(--mist); }
-.bd-display { font-family: 'Bricolage Grotesque', 'DM Sans', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.035em; }
-.bd-wrap { position: relative; margin: 0 auto; width: 100%; max-width: 1180px; }
-.bd-sec { position: relative; isolation: isolate; overflow: hidden; padding: 64px 20px; }
-@media (min-width: 640px) { .bd-sec { padding: 80px 32px; } }
-@media (min-width: 1024px) { .bd-sec { padding: 112px 48px; } }
-.bd-abyss { background: var(--abyss); }
-.bd-blob { border-radius: 9999px; filter: blur(80px); }
-.bd-grid-bg {
-  background-image: linear-gradient(rgba(118,171,174,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(118,171,174,.07) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 75%);
-}
+const SERVICES = [
+  "Website Design & Development",
+  "Web Application Development",
+  "Mobile App Development",
+  "UI/UX Design",
+  "Digital Transformation",
+  "AI & Automation",
+  "E-commerce Development",
+  "Other",
+] as const;
 
-/* ---------- fluid type (smaller, scales with screen) ---------- */
-.bd-h1 { font-size: clamp(2.1rem, 6vw, 4rem); line-height: 1.06; font-weight: 700; }
-.bd-h2 { font-size: clamp(1.7rem, 4.2vw, 2.6rem); line-height: 1.12; font-weight: 700; }
-.bd-h3 { font-size: clamp(1.45rem, 3vw, 2.1rem); line-height: 1.15; font-weight: 700; }
-.bd-lead { font-size: clamp(.97rem, 1.7vw, 1.06rem); line-height: 1.75; }
+/* =====================================================================
+   2. FORM TYPES, VALIDATION, SUBMISSION (EmailJS)
+   ===================================================================== */
 
-/* ---------- keyframes ---------- */
-@keyframes bd-spin { to { transform: rotate(360deg); } }
-@keyframes bd-rise { from { transform: translateY(110%); } to { transform: translateY(0); } }
-@keyframes bd-up { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
-@keyframes bd-pop { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
-@keyframes bd-ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(2.2); opacity: 0; } }
-@keyframes bd-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-@keyframes bd-shine { 0% { transform: translateX(-120%); } 100% { transform: translateX(260%); } }
-@keyframes bd-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
-@keyframes bd-cue { 0% { transform: translateY(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
-@keyframes bd-drift-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(60px,40px) scale(1.15); } }
-@keyframes bd-drift-b { 0%,100% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-70px,-30px) scale(.95); } }
-@keyframes bd-sigping { 0% { transform: scale(1); opacity: .7; } 100% { transform: scale(2.5); opacity: 0; } }
-@keyframes bd-nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
-@keyframes bd-drawk { to { stroke-dashoffset: 0; } }
-.bd-blob-a { animation: bd-drift-a 16s ease-in-out infinite; }
-.bd-blob-b { animation: bd-drift-b 20s ease-in-out infinite; }
+type FieldName =
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "company"
+  | "service"
+  | "message";
 
-/* ---------- progress ---------- */
-.bd-progress { background: linear-gradient(90deg, var(--cyan), var(--cyan-3), var(--pale)); box-shadow: 0 0 14px rgba(118,171,174,.8); }
+type FormValues = Record<FieldName, string>;
+type FormErrors = Partial<Record<FieldName, string>>;
+type Status = "idle" | "submitting" | "success" | "error";
 
-/* ---------- reveal ---------- */
-.bd-reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); will-change: transform, opacity; }
-.bd-reveal.bd-l { transform: translateX(-48px); }
-.bd-reveal.bd-r { transform: translateX(48px); }
-.bd-reveal.bd-s { transform: scale(.9); }
-.bd-reveal.bd-in { opacity: 1; transform: none; }
-.bd-hr { opacity: 0; animation: bd-up .9s cubic-bezier(.16,1,.3,1) forwards; animation-delay: var(--d, 0ms); }
-@media (max-width: 639px) {
-  .bd-reveal, .bd-reveal.bd-l, .bd-reveal.bd-r { transform: translateY(28px); }
-  .bd-reveal.bd-in { transform: none; }
+const FIELD_ORDER: FieldName[] = [
+  "firstName",
+  "lastName",
+  "email",
+  "phone",
+  "company",
+  "service",
+  "message",
+];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function readValues(form: HTMLFormElement): FormValues {
+  const data = new FormData(form);
+  const get = (k: FieldName) => String(data.get(k) ?? "").trim();
+  return {
+    firstName: get("firstName"),
+    lastName: get("lastName"),
+    email: get("email"),
+    phone: get("phone"),
+    company: get("company"),
+    service: get("service"),
+    message: get("message"),
+  };
 }
 
-/* ---------- word rise + gradient text ---------- */
-.bd-word { display: inline-block; overflow: hidden; vertical-align: bottom; padding: 0 .06em .14em; margin: 0 -.06em -.14em; }
-.bd-word > span { display: inline-block; transform: translateY(110%); animation: bd-rise 1s cubic-bezier(.16,1,.3,1) forwards; animation-delay: var(--d, 0ms); }
-.bd-view .bd-word > span { animation-play-state: paused; }
-.bd-view.bd-in .bd-word > span { animation-play-state: running; }
-.bd-gt {
-  background-image: linear-gradient(100deg, #B9D6D8 0%, #76ABAE 30%, #EEEEEE 55%, #76ABAE 80%, #B9D6D8 100%);
-  background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: transparent; animation: bd-shimmer 6s linear infinite;
-}
-
-/* ---------- pill ---------- */
-.bd-pill { display: inline-flex; align-items: center; gap: .7rem; padding: .42rem 1.1rem; border-radius: 9999px; font-size: .8rem; font-weight: 600; color: var(--pale); background: rgba(118,171,174,.1); border: 1px solid rgba(118,171,174,.3); }
-.bd-pill i { position: relative; width: 8px; height: 8px; border-radius: 9999px; background: var(--cyan-3); }
-.bd-pill i::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--cyan-3); animation: bd-ping 1.8s ease-out infinite; }
-
-/* ---------- buttons ---------- */
-.bd-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: .7rem; border-radius: 9999px; padding: .9rem 2rem; min-height: 48px; font-weight: 700; font-size: 14.5px; border: 0; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .3s, background-position .6s, background .3s, border-color .3s, opacity .3s; }
-.bd-btn-pri { color: #222831; background: linear-gradient(100deg, #76ABAE, #B9D6D8, #76ABAE); background-size: 200% auto; box-shadow: 0 10px 40px rgba(118,171,174,.45); }
-.bd-btn-pri:hover:not(:disabled) { background-position: 100% 0; box-shadow: 0 16px 56px rgba(118,171,174,.65); transform: translateY(-2px); }
-.bd-btn-pri::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: 0; background: linear-gradient(100deg, transparent, rgba(238,238,238,.65), transparent); animation: bd-shine 3.2s ease-in-out infinite; }
-.bd-btn:disabled { opacity: .75; cursor: progress; }
-.bd-btn-ghost { color: #EEEEEE; border: 1px solid rgba(238,238,238,.3); background: rgba(238,238,238,.03); }
-.bd-btn-ghost:hover { background: rgba(238,238,238,.1); border-color: rgba(238,238,238,.6); transform: translateY(-2px); }
-.bd-btn-pri .bd-send { transition: transform .35s cubic-bezier(.16,1,.3,1); }
-.bd-btn-pri:hover:not(:disabled) .bd-send { transform: translate(3px,-3px); }
-@media (max-width: 479px) { .bd-btn { width: 100%; } }
-.bd-spinner { width: 18px; height: 18px; border-radius: 9999px; border: 2px solid rgba(34,40,49,.3); border-top-color: #222831; animation: bd-spin .8s linear infinite; }
-
-/* ---------- hero ---------- */
-.bd-hero { position: relative; isolation: isolate; overflow: hidden; padding: 116px 20px 72px; background: radial-gradient(700px circle at 70% 30%, rgba(118,171,174,.16), transparent 60%), linear-gradient(180deg, #31363F 0%, #222831 100%); }
-@media (min-width: 640px) { .bd-hero { padding: 140px 32px 88px; } }
-@media (min-width: 1024px) { .bd-hero { padding: 168px 48px 112px; } }
-.bd-cue { width: 24px; height: 38px; border: 2px solid rgba(238,238,238,.35); border-radius: 9999px; position: relative; }
-.bd-cue::after { content: ''; position: absolute; left: 50%; top: 7px; width: 4px; height: 7px; margin-left: -2px; border-radius: 9999px; background: var(--cyan-3); animation: bd-cue 1.8s ease-in-out infinite; }
-
-/* signal visual (24h response) */
-.bd-sig { position: relative; width: 100%; max-width: 280px; aspect-ratio: 1; margin-inline: auto; }
-@media (min-width: 640px) { .bd-sig { max-width: 340px; } }
-@media (min-width: 1024px) { .bd-sig { max-width: 380px; } }
-.bd-sig-ring { position: absolute; inset: 29%; border-radius: 9999px; border: 1px solid rgba(118,171,174,.55); animation: bd-sigping 4s ease-out infinite; animation-delay: var(--d, 0ms); }
-.bd-orbit { position: absolute; border-radius: 9999px; border: 1px dashed rgba(118,171,174,.3); animation: bd-spin var(--t, 30s) linear infinite; }
-.bd-orbit i { position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; border-radius: 9999px; background: #9CC5C8; box-shadow: 0 0 16px rgba(156,197,200,.9); }
-.bd-core { position: absolute; inset: 29%; border-radius: 9999px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  background: radial-gradient(circle at 35% 25%, rgba(118,171,174,.45), rgba(34,40,49,.92) 70%); border: 1px solid rgba(118,171,174,.45); box-shadow: 0 0 70px rgba(118,171,174,.5), inset 0 0 30px rgba(118,171,174,.2); animation: bd-float 7s ease-in-out infinite; }
-
-/* ---------- info rows ---------- */
-.bd-rule { height: 3px; width: 0; border-radius: 9999px; background: linear-gradient(90deg, #76ABAE, #B9D6D8); box-shadow: 0 0 14px rgba(118,171,174,.7); transition: width 1.1s cubic-bezier(.16,1,.3,1) .3s; }
-.bd-in .bd-rule, .bd-rule.bd-in { width: 56px; }
-.bd-info { display: flex; align-items: center; gap: 14px; padding: 16px 16px; border-radius: 18px; border: 1px solid rgba(118,171,174,.16); background: linear-gradient(160deg, #353b46, #2c323b); transition: transform .35s cubic-bezier(.16,1,.3,1), border-color .35s, box-shadow .35s; }
-.bd-info:hover { transform: translateX(4px); border-color: rgba(118,171,174,.5); box-shadow: 0 18px 40px -16px rgba(118,171,174,.35); }
-.bd-ico { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; flex: none; background: rgba(118,171,174,.12); border: 1px solid rgba(118,171,174,.25); color: var(--cyan-3); transition: background .3s, color .3s, transform .3s; }
-.bd-info:hover .bd-ico { background: linear-gradient(135deg, #76ABAE, #B9D6D8); color: #222831; transform: rotate(-6deg); }
-.bd-info h3 { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--cyan-3); margin: 0; }
-.bd-info a, .bd-info span.bd-val { display: inline-block; margin-top: 2px; font-size: 16px; font-weight: 600; color: #EEEEEE; transition: color .25s; overflow-wrap: anywhere; }
-.bd-info a:hover { color: var(--cyan-3); }
-.bd-social { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.bd-social a { margin: 0; font-size: 13.5px; font-weight: 600; padding: 6px 14px; border-radius: 9999px; border: 1px solid rgba(118,171,174,.3); color: #EEEEEE; transition: background .25s, color .25s, border-color .25s, transform .25s; }
-.bd-social a:hover { background: linear-gradient(135deg, #76ABAE, #B9D6D8); color: #222831; border-color: transparent; transform: translateY(-2px); }
-
-@media (min-width: 640px) { .bd-info { gap: 18px; padding: 20px 22px; border-radius: 20px; } .bd-info a, .bd-info span.bd-val { font-size: 18px; } }
-
-/* ---------- form ---------- */
-.bd-card { position: relative; overflow: hidden; border-radius: 24px; background: linear-gradient(160deg, #353b46, #2c323b); border: 1px solid rgba(118,171,174,.22); padding: 28px 18px; box-shadow: 0 30px 70px -20px rgba(118,171,174,.3); }
-@media (min-width: 640px) { .bd-card { padding: 44px 40px; border-radius: 28px; } }
-.bd-card::before { content: ''; position: absolute; right: -100px; top: -100px; width: 300px; height: 300px; border-radius: 9999px; background: radial-gradient(circle, rgba(118,171,174,.28), transparent 70%); pointer-events: none; }
-.bd-card > * { position: relative; }
-.bd-card-center { display: flex; align-items: center; justify-content: center; }
-.bd-card-center > .bd-ok { width: 100%; }
-.bd-field { position: relative; }
-.bd-input { width: 100%; padding: 28px 16px 10px; border-radius: 14px; background: rgba(34,40,49,.65); border: 1px solid rgba(118,171,174,.2); color: #EEEEEE; font: inherit; font-size: 16px; line-height: 1.4; transition: border-color .25s, box-shadow .25s, background .25s; -webkit-appearance: none; appearance: none; }
-.bd-input:hover { border-color: rgba(118,171,174,.45); }
-.bd-input:focus { outline: none; border-color: var(--cyan); background: rgba(34,40,49,.9); box-shadow: 0 0 0 4px rgba(118,171,174,.16); }
-.bd-input[aria-invalid="true"] { border-color: #D99A9A; box-shadow: 0 0 0 3px rgba(217,154,154,.14); }
-textarea.bd-input { min-height: 150px; resize: vertical; }
-.bd-input option { background: #31363F; color: #EEEEEE; }
-.bd-label { position: absolute; left: 17px; top: 17px; max-width: calc(100% - 34px); color: #8A9299; font-size: 16px; pointer-events: none; transform-origin: left top; transition: transform .25s cubic-bezier(.16,1,.3,1), color .25s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bd-input:focus + .bd-label,
-.bd-input:not(:placeholder-shown) + .bd-label,
-.bd-field-sel .bd-label { transform: translateY(-11px) scale(.76); }
-.bd-input:focus + .bd-label { color: var(--cyan-3); }
-.bd-chev { position: absolute; right: 16px; top: 50%; margin-top: -9px; color: var(--cyan-3); pointer-events: none; }
-.bd-err { display: flex; align-items: center; gap: 6px; margin: 8px 4px 0; font-size: 13.5px; color: #E6B0B0 !important; animation: bd-pop .35s cubic-bezier(.16,1,.3,1); }
-.bd-fail { margin-top: 18px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(217,154,154,.4); background: rgba(217,154,154,.08); font-size: 15px; color: #EEEEEE !important; animation: bd-pop .4s cubic-bezier(.16,1,.3,1); }
-.bd-ok { text-align: center; padding: 20px 0; animation: bd-pop .6s cubic-bezier(.16,1,.3,1); }
-.bd-ok-ico { width: 76px; height: 76px; margin: 0 auto 26px; border-radius: 9999px; display: grid; place-items: center; color: #222831; background: linear-gradient(135deg, #76ABAE, #B9D6D8); box-shadow: 0 0 50px rgba(118,171,174,.6); position: relative; }
-.bd-ok-ico::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid rgba(118,171,174,.6); animation: bd-ping 2.4s ease-out infinite; }
-.bd-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: bd-drawk .7s ease .25s forwards; }
-
-/* ---------- steps ---------- */
-.bd-steps { position: relative; display: grid; gap: 20px; }
-@media (min-width: 900px) { .bd-steps { grid-template-columns: repeat(3, 1fr); gap: 28px; } }
-.bd-steps-line { display: none; }
-@media (min-width: 900px) {
-  .bd-steps-line { display: block; position: absolute; top: 28px; left: 28px; right: 28px; height: 2px; background: rgba(238,238,238,.12); border-radius: 9999px; overflow: hidden; }
-  .bd-steps-line i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #76ABAE, #B9D6D8); box-shadow: 0 0 12px rgba(118,171,174,.8); transition: width 2s cubic-bezier(.16,1,.3,1) .2s; }
-  .bd-in .bd-steps-line i { width: 100%; }
-}
-.bd-step { position: relative; opacity: 0; transform: translateY(30px); transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1); transition-delay: var(--d, 0ms); }
-.bd-in .bd-step { opacity: 1; transform: none; }
-.bd-step-n { position: relative; z-index: 1; width: 52px; height: 52px; border-radius: 9999px; display: grid; place-items: center; background: var(--abyss); border: 1px solid rgba(118,171,174,.55); color: var(--cyan-3); font-weight: 700; box-shadow: 0 0 0 8px var(--abyss); }
-.bd-step-card { margin-top: 18px; height: 100%; position: relative; padding: 24px 20px; border-radius: 22px; border: 1px solid rgba(118,171,174,.16); background: linear-gradient(160deg, #353b46, #2c323b); transition: transform .35s cubic-bezier(.16,1,.3,1), border-color .35s, box-shadow .35s; }
-.bd-step-card:hover { transform: translateY(-5px); border-color: rgba(118,171,174,.5); box-shadow: 0 24px 50px -18px rgba(118,171,174,.35); }
-.bd-step-card:hover .bd-ico { background: linear-gradient(135deg, #76ABAE, #B9D6D8); color: #222831; transform: rotate(-6deg); }
-.bd-step-arrow { display: none; position: absolute; right: 24px; top: 30px; color: var(--cyan-3); font-size: 22px; animation: bd-nudge 2s ease-in-out infinite; }
-@media (min-width: 900px) { .bd-step-arrow { display: block; } }
-.bd-ghost { position: absolute; right: 14px; bottom: -20px; font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800; font-size: 100px; line-height: 1; color: transparent; -webkit-text-stroke: 1.5px rgba(118,171,174,.16); pointer-events: none; user-select: none; }
-
-@media (min-width: 640px) { .bd-step-card { padding: 30px 28px; border-radius: 24px; } .bd-ghost { font-size: 130px; bottom: -26px; right: 16px; } }
-
-/* ---------- fab ---------- */
-.bd-fab { position: fixed; z-index: 40; display: flex; align-items: center; justify-content: center; border-radius: 9999px; transition: transform .3s, opacity .3s; }
-.bd-fab:hover { transform: translateY(-3px) scale(1.06); }
-
-.bd-root a[href],
-.bd-root button:not(:disabled),
-.bd-root [role="tab"],
-.bd-root select,
-.bd-btn,
-.bd-fab { cursor: pointer; }
-.bd-root a[href] *, .bd-root button:not(:disabled) * { cursor: inherit; }
-.bd-root button:disabled { cursor: progress; }
-
-.bd-root a:focus-visible, .bd-root button:focus-visible { outline: 2px solid var(--cyan-3); outline-offset: 4px; border-radius: 8px; }
-
-@media (prefers-reduced-motion: reduce) {
-  .bd-root *, .bd-root *::before, .bd-root *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
-  .bd-reveal { opacity: 1 !important; transform: none !important; }
-  .bd-word > span { transform: none !important; }
-  .bd-hr { opacity: 1 !important; }
-  .bd-rule { width: 56px !important; }
-  .bd-step { opacity: 1 !important; transform: none !important; }
-  .bd-steps-line i { width: 100% !important; }
-  .bd-draw { stroke-dashoffset: 0 !important; }
-}
-`;
-
-/* -------------------------------------------------------------------------- */
-/*  Hooks & helpers (same as the About page)                                  */
-/* -------------------------------------------------------------------------- */
-
-function useInView<T extends HTMLElement>(threshold = 0.15) {
-  const ref = useRef<T>(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) {
-          setInView(true);
-          io.disconnect();
-        }
-      },
-      { threshold, rootMargin: "0px 0px -6% 0px" }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [threshold]);
-  return { ref, inView };
-}
-
-function Reveal({
-  children,
-  delay = 0,
-  from = "up",
-  className = "",
-}: {
-  children: ReactNode;
-  delay?: number;
-  from?: "up" | "left" | "right" | "scale";
-  className?: string;
-}) {
-  const { ref, inView } = useInView<HTMLDivElement>();
-  const dir = from === "left" ? "bd-l" : from === "right" ? "bd-r" : from === "scale" ? "bd-s" : "";
-  return (
-    <div ref={ref} className={`bd-reveal ${dir} ${inView ? "bd-in" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
-      {children}
-    </div>
-  );
-}
-
-function Words({
-  text,
-  startDelay = 0,
-  step = 70,
-  className = "",
-  trailing = true,
-}: {
-  text: string;
-  startDelay?: number;
-  step?: number;
-  className?: string;
-  trailing?: boolean;
-}) {
-  const words = text.split(" ");
-  return (
-    <>
-      {words.map((w, i) => (
-        <span key={`${w}-${i}`} className="bd-word">
-          <span className={className} style={{ "--d": `${startDelay + i * step}ms` } as CSSProperties}>
-            {w}
-            {trailing || i < words.length - 1 ? "\u00a0" : ""}
-          </span>
-        </span>
-      ))}
-    </>
-  );
-}
-
-function WordsOnView({ text, wordClassName = "", trailing = true }: { text: string; wordClassName?: string; trailing?: boolean }) {
-  const { ref, inView } = useInView<HTMLSpanElement>(0.3);
-  return (
-    <span ref={ref} className={`bd-view ${inView ? "bd-in" : ""}`}>
-      <Words text={text} className={wordClassName} trailing={trailing} />
-    </span>
-  );
-}
-
-function ScrollProgress() {
-  const barRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    let raf = 0;
-    const update = () => {
-      const d = document.documentElement;
-      const max = d.scrollHeight - d.clientHeight;
-      if (barRef.current) barRef.current.style.transform = `scaleX(${max > 0 ? d.scrollTop / max : 0})`;
-      raf = 0;
-    };
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(update);
-    };
-    update();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, []);
-  return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-50" style={{ height: 3 }}>
-      <div ref={barRef} className="bd-progress h-full origin-left" style={{ transform: "scaleX(0)" }} />
-    </div>
-  );
-}
-
-/** Flowing light trails + glowing network dots. Static when reduced motion is on. */
-function NetworkCanvas({ intensity = 1 }: { intensity?: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const c = ref.current;
-    const ctx = c?.getContext("2d");
-    if (!c || !ctx) return;
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    let W = 0, H = 0, raf = 0;
-    let pts: { x: number; y: number; vx: number; vy: number; p: number }[] = [];
-
-    const size = () => {
-      const r = c.parentElement!.getBoundingClientRect();
-      W = r.width; H = r.height;
-      c.width = W * dpr; c.height = H * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.round(Math.min(70, W / 22) * intensity);
-      pts = Array.from({ length: n }, () => ({
-        x: Math.random() * W, y: Math.random() * H,
-        vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25, p: Math.random() * 6,
-      }));
-    };
-
-    const draw = (ms: number) => {
-      const t = ms / 1000;
-      ctx.clearRect(0, 0, W, H);
-      for (let k = 0; k < 5; k++) {
-        const g = ctx.createLinearGradient(0, 0, W, 0);
-        g.addColorStop(0, "rgba(118,171,174,0)");
-        g.addColorStop(0.5, k % 2 ? "rgba(185,214,216,.5)" : "rgba(118,171,174,.5)");
-        g.addColorStop(1, "rgba(118,171,174,0)");
-        ctx.strokeStyle = g; ctx.lineWidth = 1 + k * 0.5; ctx.beginPath();
-        for (let i = 0; i <= W; i += 16) {
-          const y = H * (0.62 + k * 0.018) + Math.sin((i / W) * 3.2 + t * 0.35 + k * 0.5) * H * 0.1 + Math.sin((i / W) * 7 + t * 0.5 + k) * H * 0.025;
-          if (i) ctx.lineTo(i, y); else ctx.moveTo(i, y);
-        }
-        ctx.stroke();
-      }
-      pts.forEach((P, a) => {
-        P.x += P.vx; P.y += P.vy;
-        if (P.x < 0 || P.x > W) P.vx *= -1;
-        if (P.y < 0 || P.y > H) P.vy *= -1;
-        for (let b = a + 1; b < pts.length; b++) {
-          const Q = pts[b], d = Math.hypot(P.x - Q.x, P.y - Q.y);
-          if (d < 130) {
-            ctx.strokeStyle = `rgba(118,171,174,${0.25 * (1 - d / 130)})`;
-            ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(P.x, P.y); ctx.lineTo(Q.x, Q.y); ctx.stroke();
-          }
-        }
-        const gl = 0.5 + 0.5 * Math.sin(t * 1.6 + P.p);
-        ctx.fillStyle = `rgba(185,214,216,${0.35 + 0.5 * gl})`;
-        ctx.beginPath(); ctx.arc(P.x, P.y, 1.6 + gl, 0, 6.3); ctx.fill();
-      });
-      if (!reduce) raf = requestAnimationFrame(draw);
-    };
-
-    size();
-    const onResize = () => { size(); if (reduce) draw(0); };
-    window.addEventListener("resize", onResize);
-    if (reduce) draw(0); else raf = requestAnimationFrame(draw);
-    return () => { window.removeEventListener("resize", onResize); cancelAnimationFrame(raf); };
-  }, [intensity]);
-  return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 h-full w-full" />;
-}
-
-function Icon({ children, size = 24, stroke = 2 }: { children: ReactNode; size?: number; stroke?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {children}
-    </svg>
-  );
-}
-
-function SectionHead({ pill, title, text }: { pill: string; title: ReactNode; text?: string }) {
-  return (
-    <div className="mx-auto max-w-3xl text-center">
-      <Reveal from="scale">
-        <span className="bd-pill"><i />{pill}</span>
-      </Reveal>
-      <h2 className="bd-display bd-h2 mt-4" style={{ color: "#EEEEEE" }}>
-        {title}
-      </h2>
-      {text && (
-        <Reveal delay={200}>
-          <p className="bd-lead mx-auto mt-4 max-w-xl" style={{ color: "#B3B8BD" }}>{text}</p>
-        </Reveal>
-      )}
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Hero visual — pulsing signal around the 24h response time                 */
-/* -------------------------------------------------------------------------- */
-
-function Signal() {
-  const d = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
-  return (
-    <div className="bd-sig" aria-hidden="true">
-      <span className="bd-sig-ring" style={d(0)} />
-      <span className="bd-sig-ring" style={d(1300)} />
-      <span className="bd-sig-ring" style={d(2600)} />
-      <div className="bd-orbit" style={{ inset: "6%", ["--t" as string]: "36s" }}><i /></div>
-      <div className="bd-orbit" style={{ inset: "18%", ["--t" as string]: "24s", animationDirection: "reverse" }}><i /></div>
-      <div className="bd-core">
-        <span className="mb-1" style={{ color: "#9CC5C8" }}><Icon size={22} stroke={1.8}>{ICONS.mail}</Icon></span>
-        <span className="text-xs font-medium" style={{ color: "#B3B8BD" }}>Response Time</span>
-        <span className="bd-display bd-gt text-4xl font-bold leading-none sm:text-5xl">24h</span>
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Contact form                                                              */
-/* -------------------------------------------------------------------------- */
-
-type Values = { firstName: string; lastName: string; email: string; phone: string; service: string; message: string };
-type Errors = Partial<Record<"firstName" | "lastName" | "email" | "message", string>>;
-type Status = "idle" | "sending" | "success" | "error";
-
-const EMPTY: Values = { firstName: "", lastName: "", email: "", phone: "", service: "", message: "" };
-
-function validate(v: Values): Errors {
-  const e: Errors = {};
-  if (!v.firstName.trim()) e.firstName = "Please enter your first name.";
-  if (!v.lastName.trim()) e.lastName = "Please enter your last name.";
-  if (!v.email.trim()) e.email = "Please enter your email address.";
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email.trim())) e.email = "Please enter a valid email address.";
-  if (!v.message.trim()) e.message = "Please tell us about your project.";
+function validate(v: FormValues): FormErrors {
+  const e: FormErrors = {};
+  if (!v.firstName) e.firstName = "Please enter your first name.";
+  if (!v.lastName) e.lastName = "Please enter your last name.";
+  if (!v.email) e.email = "Please enter your email address.";
+  else if (!EMAIL_RE.test(v.email)) e.email = "Please enter a valid email address.";
+  if (v.phone) {
+    const digits = v.phone.replace(/\D/g, "");
+    const shapeOk = /^\+?[0-9\s().-]+$/.test(v.phone);
+    if (!shapeOk || digits.length < 7 || digits.length > 15) {
+      e.phone = "Please enter a valid phone number (for example +1 555 123 4567).";
+    }
+  }
+  if (!v.service) e.service = "Please select a service.";
+  if (!v.message) e.message = "Please tell us a little about your project.";
   return e;
 }
 
-function Field({
-  id,
-  label,
-  value,
-  onChange,
-  required = false,
-  error,
-  type = "text",
-  as = "input",
-  autoComplete,
+class NotConfiguredError extends Error {}
+
+async function submitContact(values: FormValues): Promise<void> {
+  const { serviceId, templateId, publicKey } = EMAILJS;
+  if (!serviceId || !templateId || !publicKey) throw new NotConfiguredError();
+
+  await emailjs.send(
+    serviceId,
+    templateId,
+    
+{
+  sender_name: `${values.firstName} ${values.lastName}`,
+  sender_email: values.email,
+  reply_to: values.email,
+  phone: values.phone || "Not provided",
+  company: values.company || "Not provided",
+  subject: values.service,
+  service: values.service,
+  message: values.message,
+}
+,
+    { publicKey }
+  );
+}
+
+/* =====================================================================
+   3. ANIMATED BORDER (stroke that draws itself, clockwise)
+   ===================================================================== */
+
+const FIELD_RADIUS = 6;
+
+function clockwisePath(w: number, h: number, inset: number, radius: number): string {
+  const x1 = inset;
+  const y1 = inset;
+  const x2 = w - inset;
+  const y2 = h - inset;
+  const r = Math.max(0, Math.min(radius, (x2 - x1) / 2, (y2 - y1) / 2));
+  return [
+    `M ${x1} ${y1 + r}`,
+    `A ${r} ${r} 0 0 1 ${x1 + r} ${y1}`,
+    `H ${x2 - r}`,
+    `A ${r} ${r} 0 0 1 ${x2} ${y1 + r}`,
+    `V ${y2 - r}`,
+    `A ${r} ${r} 0 0 1 ${x2 - r} ${y2}`,
+    `H ${x1 + r}`,
+    `A ${r} ${r} 0 0 1 ${x1} ${y2 - r}`,
+    `V ${y1 + r}`,
+  ].join(" ");
+}
+
+function AnimatedBorder({
+  children,
+  invalid,
 }: {
-  id: keyof Values;
-  label: string;
-  value: string;
-  onChange: (id: keyof Values, v: string) => void;
-  required?: boolean;
-  error?: string;
-  type?: string;
-  as?: "input" | "textarea" | "select";
-  autoComplete?: string;
+  children: ReactNode;
+  invalid?: boolean;
 }) {
-  const common = {
-    id,
-    name: id,
-    value,
-    required,
-    autoComplete,
-    "aria-invalid": error ? true : undefined,
-    "aria-describedby": error ? `${id}-err` : undefined,
-    className: "bd-input",
-    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => onChange(id, e.target.value),
-  };
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      setBox((p) => (p.w === w && p.h === h ? p : { w, h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   return (
-    <div className={`bd-field ${as === "select" ? "bd-field-sel" : ""}`}>
-      {as === "textarea" && <textarea {...common} placeholder=" " rows={5} />}
-      {as === "input" && <input {...common} type={type} placeholder=" " />}
-      {as === "select" && (
-        <>
-          <select {...common}>
-            <option value="">Select a service...</option>
-            {SERVICES.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <span className="bd-chev"><Icon size={18} stroke={2.2}><path d="m6 9 6 6 6-6" /></Icon></span>
-        </>
+    <div
+      ref={ref}
+      className={`ct-ab${active ? " is-active" : ""}${invalid ? " is-invalid" : ""}`}
+      onFocus={() => setActive(true)}
+      onBlur={() => setActive(false)}
+    >
+      {children}
+      {box.w > 0 && (
+        <svg
+          className="ct-ab-svg"
+          width={box.w}
+          height={box.h}
+          viewBox={`0 0 ${box.w} ${box.h}`}
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            className="ct-ab-stroke"
+            d={clockwisePath(box.w, box.h, 1, FIELD_RADIUS - 1)}
+            pathLength={100}
+            fill="none"
+          />
+        </svg>
       )}
-      <label htmlFor={id} className="bd-label">
+    </div>
+  );
+}
+
+/* =====================================================================
+   4. FIELD COMPONENTS
+   ===================================================================== */
+
+function FieldShell({
+  id,
+  label,
+  required,
+  error,
+  children,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="ct-field ct-reveal">
+      <label htmlFor={id} className="ct-label">
         {label}
-        {required && <span aria-hidden="true"> *</span>}
+        {required ? (
+          <span className="ct-req" aria-hidden="true"> *</span>
+        ) : (
+          <span className="ct-opt"> (optional)</span>
+        )}
       </label>
+      <AnimatedBorder invalid={!!error}>{children}</AnimatedBorder>
       {error && (
-        <p id={`${id}-err`} className="bd-err">
-          <Icon size={14} stroke={2.4}><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></Icon>
+        <p id={`${id}-err`} className="ct-error" role="alert">
           {error}
         </p>
       )}
@@ -614,316 +276,914 @@ function Field({
   );
 }
 
-function ContactForm() {
-  const [values, setValues] = useState<Values>(EMPTY);
-  const [errors, setErrors] = useState<Errors>({});
-  const [status, setStatus] = useState<Status>("idle");
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [cardH, setCardH] = useState(0);
+type FieldBase = {
+  name: FieldName;
+  label: string;
+  required?: boolean;
+  error?: string;
+};
 
-  const set = (id: keyof Values, v: string) => {
-    setValues((p) => ({ ...p, [id]: v }));
-    if (id in errors) setErrors((p) => ({ ...p, [id]: undefined }));
-  };
+function TextField({
+  name,
+  label,
+  required,
+  error,
+  type = "text",
+  autoComplete,
+  placeholder,
+}: FieldBase & {
+  type?: "text" | "email" | "tel";
+  autoComplete?: string;
+  placeholder?: string;
+}) {
+  const id = useId();
+  return (
+    <FieldShell id={id} label={label} required={required} error={error}>
+      <input
+        id={id}
+        name={name}
+        type={type}
+        inputMode={type === "tel" ? "tel" : undefined}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        className="ct-control"
+        aria-required={required ? true : undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-err` : undefined}
+      />
+    </FieldShell>
+  );
+}
 
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (status === "sending") return;
-    const errs = validate(values);
-    setErrors(errs);
-    const first = Object.keys(errs)[0];
-    if (first) {
-      document.getElementById(first)?.focus();
-      return;
-    }
-    setStatus("sending");
-    try {
-      // Template variables: {{from_name}} {{reply_to}} {{phone}} {{service}} {{message}}
-      await emailjs.send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
-        {
-          from_name: `${values.firstName.trim()} ${values.lastName.trim()}`,
-          reply_to: values.email.trim(),
-          phone: values.phone.trim() || "-",
-          service: values.service || "-",
-          message: values.message.trim(),
-        },
-        { publicKey: EMAILJS_PUBLIC_KEY }
-      );
-      setCardH(cardRef.current?.offsetHeight ?? 0);
-      setValues(EMPTY);
-      setStatus("success");
-    } catch {
-      setStatus("error");
-    }
-  };
+function SelectField({ name, label, required, error }: FieldBase) {
+  const id = useId();
+  return (
+    <FieldShell id={id} label={label} required={required} error={error}>
+      <select
+        id={id}
+        name={name}
+        defaultValue=""
+        className="ct-control ct-select"
+        aria-required={required ? true : undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-err` : undefined}
+      >
+        <option value="">Select a service</option>
+        {SERVICES.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+    </FieldShell>
+  );
+}
 
-  if (status === "success") {
+function TextAreaField({
+  name,
+  label,
+  required,
+  error,
+  placeholder,
+}: FieldBase & { placeholder?: string }) {
+  const id = useId();
+  return (
+    <FieldShell id={id} label={label} required={required} error={error}>
+      <textarea
+        id={id}
+        name={name}
+        rows={5}
+        placeholder={placeholder}
+        className="ct-control ct-textarea"
+        aria-required={required ? true : undefined}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-err` : undefined}
+      />
+    </FieldShell>
+  );
+}
+
+/* =====================================================================
+   5. ANIMATED ICONS (inline SVG, no external files)
+   ===================================================================== */
+
+function PinIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+// Small paper plane that flies while the message is sending.
+function PlaneIcon() {
+  return (
+    <svg
+      className="ct-plane"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
+    </svg>
+  );
+}
+
+// Animated alert icon for errors.
+function AlertIcon() {
+  return (
+    <svg
+      className="ct-alert-ico"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 7v6" />
+      <circle cx="12" cy="16.5" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+// "Email sent" animation: ring draws, envelope pops in, flap draws,
+// green badge pops, check draws, sparks burst outward.
+function SentIcon() {
+  if (SUCCESS_ICON_SRC) {
     return (
-      <div className="bd-card bd-card-center" style={cardH ? { minHeight: cardH } : undefined}>
-        <div className="bd-ok" role="status">
-          <div className="bd-ok-ico">
-            <Icon size={40} stroke={2.6}><path d="M20 6 9 17l-5-5" pathLength={1} className="bd-draw" /></Icon>
-          </div>
-          <h2 className="bd-display bd-h3" style={{ color: "#EEEEEE" }}>Message Sent</h2>
-          <p className="bd-lead mx-auto mt-4 max-w-sm">Thank you for reaching out. Our team will get back to you within 24 hours.</p>
-          <button type="button" className="bd-btn bd-btn-ghost mt-8" onClick={() => setStatus("idle")}>Send another message</button>
-        </div>
+      <div className="ct-ok-wrap">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={SUCCESS_ICON_SRC} alt="" width={120} height={120} className="ct-ok-img" />
       </div>
     );
   }
 
   return (
-    <div ref={cardRef} className="bd-card">
-      <h2 className="bd-display bd-h3" style={{ color: "#EEEEEE" }}>Send Us a Message</h2>
-      <div className="bd-rule bd-in mt-4" />
-      <p className="bd-lead mt-4">Fill out the form below and our team will get back to you promptly.</p>
-
-      <form onSubmit={onSubmit} noValidate className="mt-6 grid gap-3 sm:mt-8 sm:gap-4">
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-          <Field id="firstName" label="First Name" value={values.firstName} onChange={set} required error={errors.firstName} autoComplete="given-name" />
-          <Field id="lastName" label="Last Name" value={values.lastName} onChange={set} required error={errors.lastName} autoComplete="family-name" />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
-          <Field id="email" label="Email Address" type="email" value={values.email} onChange={set} required error={errors.email} autoComplete="email" />
-          <Field id="phone" label="Phone Number" type="tel" value={values.phone} onChange={set} autoComplete="tel" />
-        </div>
-        <Field id="service" label="Service Interested In" as="select" value={values.service} onChange={set} />
-        <Field id="message" label="Message" as="textarea" value={values.message} onChange={set} required error={errors.message} />
-
-        <div aria-live="polite">
-          {status === "error" && (
-            <p className="bd-fail" role="alert">
-              Something went wrong while sending your message. Please try again, or email us at info@empireae.xyz.
-            </p>
-          )}
-        </div>
-
-        <div className="mt-2">
-          <button type="submit" className="bd-btn bd-btn-pri w-full sm:w-auto" disabled={status === "sending"}>
-            {status === "sending" ? (
-              <>
-                <span className="bd-spinner" aria-hidden="true" /> Sending...
-              </>
-            ) : (
-              <>
-                Send Message
-                <span className="bd-send"><Icon size={18} stroke={2.4}>{ICONS.send}</Icon></span>
-              </>
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  What happens next                                                         */
-/* -------------------------------------------------------------------------- */
-
-function Steps() {
-  const { ref, inView } = useInView<HTMLDivElement>(0.25);
-  return (
-    <div ref={ref} className={`bd-steps mt-10 sm:mt-14 ${inView ? "bd-in" : ""}`}>
-      <div className="bd-steps-line" aria-hidden="true"><i /></div>
-      {STEPS.map((s, i) => (
-        <article key={s.n} className="bd-step" style={{ "--d": `${i * 200}ms` } as CSSProperties}>
-          <div className="bd-step-n" aria-hidden="true">{s.n}</div>
-          <div className="bd-step-card overflow-hidden">
-            <span className="bd-ghost" aria-hidden="true">{s.n}</span>
-            {i < STEPS.length - 1 && <span className="bd-step-arrow" aria-hidden="true">→</span>}
-            <div className="relative">
-              <div className="bd-ico"><Icon size={22} stroke={1.8}>{s.icon}</Icon></div>
-              <h3 className="bd-display mt-5 text-xl font-semibold sm:text-2xl" style={{ color: "#EEEEEE" }}>{s.title}</h3>
-              <p className="mt-2 text-[14.5px] leading-7">{s.text}</p>
-            </div>
-          </div>
-        </article>
+    <div className="ct-ok-wrap" aria-hidden="true">
+      <svg className="ct-ok-svg" viewBox="0 0 120 120" fill="none" focusable="false">
+        <circle className="ct-ok-ring" cx="60" cy="60" r="54" pathLength={100} />
+        <g className="ct-ok-env">
+          <rect className="ct-ok-body" x="26" y="38" width="68" height="46" rx="7" />
+          <path className="ct-ok-flap" d="M29 43 L60 66 L91 43" pathLength={100} />
+        </g>
+        <circle className="ct-ok-badge" cx="90" cy="84" r="15" />
+        <path className="ct-ok-check" d="M82.5 84.5 l5 5 l9.5 -10.5" pathLength={100} />
+      </svg>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <span
+          key={i}
+          className="ct-ok-spark"
+          style={{ "--a": `${i * 36}deg`, "--d": `${700 + (i % 3) * 80}ms` } as React.CSSProperties}
+        />
       ))}
     </div>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Floating buttons                                                          */
-/* -------------------------------------------------------------------------- */
+/* =====================================================================
+   6. SECTIONS
+   ===================================================================== */
 
-function FloatingButtons() {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const onScroll = () => setShow(window.scrollY > 400);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+const HERO_LINES = ["Let's Build Something", "Meaningful Together."];
+
+function SplitHeading({ lines }: { lines: string[] }) {
   return (
-    <>
-      <a
-        href="https://wa.me/919847980605" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="bd-fab"
-        style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: 18, width: 50, height: 50, background: "#25d366", color: "#EEEEEE", boxShadow: "0 8px 28px rgba(37,211,102,.45)" }}
-      >
-        <Icon size={26} stroke={1.8}>
-          <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-          <path d="M9 9.5c.5 2 2.5 4 5 5l1.5-1.5-2-1-1 .8c-.8-.4-1.6-1.2-2-2l.8-1-1-2z" />
-        </Icon>
-      </a>
-      <button
-        type="button" aria-label="Back to top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="bd-fab"
-        style={{
-          bottom: "calc(24px + env(safe-area-inset-bottom, 0px))", right: 20, width: 46, height: 46, border: "1px solid rgba(118,171,174,.45)", background: "rgba(49,54,63,.9)", color: "#9CC5C8",
-          boxShadow: "0 8px 28px rgba(0,0,0,.4)", opacity: show ? 1 : 0, pointerEvents: show ? "auto" : "none",
-        }}
-      >
-        <Icon size={22} stroke={2.2}>
-          <path d="m5 12 7-7 7 7" />
-          <path d="M12 19V5" />
-        </Icon>
-      </button>
-    </>
+    <h1 id="ct-hero-title" className="ct-h1" aria-label={lines.join(" ")}>
+      {lines.map((line, li) => (
+        <span key={li} className="ct-line" aria-hidden="true">
+          {line.split(" ").map((word, wi) => (
+            <span key={wi}>
+              {wi > 0 ? " " : ""}
+              <span className="ct-word">
+                {Array.from(word).map((ch, ci) => (
+                  <span key={ci} className="ct-char">
+                    {ch}
+                  </span>
+                ))}
+              </span>
+            </span>
+          ))}
+          {li < lines.length - 1 ? " " : ""}
+        </span>
+      ))}
+    </h1>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Page                                                                      */
-/* -------------------------------------------------------------------------- */
-
-export default function ContactPage() {
-  const d = (ms: number) => ({ "--d": `${ms}ms` }) as CSSProperties;
-
+function ContactHero() {
   return (
-    <div className="bd-root min-h-screen">
-      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
-      <ScrollProgress />
+    <section className="ct-hero" aria-labelledby="ct-hero-title">
+      <div className="ct-hero-inner">
+        <p className="ct-eyebrow">
+          <span className="ct-bar" aria-hidden="true" />
+          LET&apos;S START A CONVERSATION
+        </p>
+        <SplitHeading lines={HERO_LINES} />
+        <p className="ct-hero-p">
+          Have an idea, a challenge, or a project in mind? We&apos;d love to hear from you.
+          Let&apos;s explore how we can turn your vision into something meaningful.
+        </p>
+      </div>
+    </section>
+  );
+}
 
-      <main>
-        {/* ============================ HERO ============================ */}
-        <section className="bd-hero">
-          <div className="bd-grid-bg pointer-events-none absolute inset-0" aria-hidden="true" />
-          <NetworkCanvas />
-          <div className="bd-wrap relative z-[2] grid items-center gap-10 sm:gap-14 lg:grid-cols-[1.25fr_1fr]">
-            <div>
-              <nav aria-label="Breadcrumb" className="bd-hr mb-5 flex items-center gap-2.5 text-sm sm:mb-6" style={d(80)}>
-                <Link href="/" className="font-medium" style={{ color: "#8A9299" }}>Home</Link>
-                <span style={{ color: "#5A626B" }}>/</span>
-                <span style={{ color: "#EEEEEE" }}>Contact</span>
-              </nav>
-
-              <span className="bd-pill bd-hr" style={d(180)}><i />Get In Touch</span>
-
-              <h1 className="bd-display bd-h1 mt-5" style={{ color: "#EEEEEE" }}>
-                <span className="block"><Words text="Let's Start a" startDelay={300} /></span>
-                <span className="block"><Words text="Conversation" startDelay={620} className="bd-gt" trailing={false} /></span>
-              </h1>
-
-              <p className="bd-hr bd-lead mt-6 max-w-xl" style={{ ...d(1000), color: "#B3B8BD" }}>
-                Have a project in mind? We&apos;d love to hear from you. Send us a message and we&apos;ll get back to you within 24 hours.
-              </p>
-            </div>
-
-            <div className="bd-hr" style={d(700)}>
-              <Signal />
-            </div>
-          </div>
-
-          <div className="bd-hr absolute bottom-7 left-1/2 hidden -translate-x-1/2 lg:block" style={d(1800)} aria-hidden="true">
-            <div className="bd-cue" />
-          </div>
-        </section>
-
-        {/* ======================= INFO + FORM ========================== */}
-        <section className="bd-sec">
-          <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-            <div className="bd-blob bd-blob-a absolute" style={{ left: "-10%", top: "10%", width: 380, height: 380, background: "rgba(118,171,174,.1)" }} />
-            <div className="bd-blob bd-blob-b absolute" style={{ right: "-8%", bottom: 0, width: 440, height: 440, background: "rgba(92,102,118,.15)" }} />
-          </div>
-
-          <div className="bd-wrap grid items-start gap-10 sm:gap-14 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-            {/* contact information */}
-            <div>
-              <Reveal>
-                <h2 className="bd-display bd-h2" style={{ color: "#EEEEEE" }}>
-                  Contact <span className="bd-gt">Information</span>
-                </h2>
-              </Reveal>
-              <Reveal delay={100}><div className="bd-rule bd-in mt-5" /></Reveal>
-              <Reveal delay={150}>
-                <p className="bd-lead mt-5">
-                  Ready to take your business to the next level? Reach out to our team and let&apos;s make it happen.
-                </p>
-              </Reveal>
-
-              <div className="mt-7 grid gap-3 sm:mt-9 sm:gap-4">
-                <Reveal delay={200}>
-                  <div className="bd-info">
-                    <div className="bd-ico"><Icon size={22} stroke={1.8}>{ICONS.phone}</Icon></div>
-                    <div>
-                      <h3>Phone</h3>
-                      <a href="tel:+919847980605">+91 9847980605</a>
-                    </div>
-                  </div>
-                </Reveal>
-                <Reveal delay={280}>
-                  <div className="bd-info">
-                    <div className="bd-ico"><Icon size={22} stroke={1.8}>{ICONS.mail}</Icon></div>
-                    <div>
-                      <h3>Email</h3>
-                      <a href="mailto:info@empireae.xyz">info@empireae.xyz</a>
-                    </div>
-                  </div>
-                </Reveal>
-                <Reveal delay={360}>
-                  <div className="bd-info">
-                    <div className="bd-ico"><Icon size={22} stroke={1.8}>{ICONS.clock}</Icon></div>
-                    <div>
-                      <h3>Response Time</h3>
-                      <span className="bd-val">Within 24 hours</span>
-                    </div>
-                  </div>
-                </Reveal>
-                <Reveal delay={440}>
-                  <div className="bd-info" style={{ alignItems: "flex-start" }}>
-                    <div className="bd-ico"><Icon size={22} stroke={1.8}>{ICONS.share}</Icon></div>
-                    <div>
-                      <h3>Follow Us</h3>
-                      <div className="bd-social">
-                        <a href="#">Facebook</a>
-                        <a href="#">Instagram</a>
-                        <a href="#">LinkedIn</a>
-                      </div>
-                    </div>
-                  </div>
-                </Reveal>
-              </div>
-            </div>
-
-            {/* form */}
-            <Reveal from="right" delay={150}>
-              <ContactForm />
-            </Reveal>
-          </div>
-        </section>
-
-        {/* ===================== WHAT HAPPENS NEXT ===================== */}
-        <section className="bd-sec bd-abyss">
-          <div className="pointer-events-none absolute inset-0" aria-hidden="true" style={{ background: "radial-gradient(ellipse at 15% 0%, rgba(118,171,174,.22), transparent 55%), radial-gradient(ellipse at 90% 100%, rgba(118,171,174,.14), transparent 55%)" }} />
-          <div className="bd-wrap">
-            <SectionHead
-              pill="Why Work With Us"
-              title={
-                <>
-                  <span className="block"><WordsOnView text="What Happens After" /></span>
-                  <span className="block"><WordsOnView text="You Contact Us" wordClassName="bd-gt" trailing={false} /></span>
-                </>
-              }
-            />
-            <Steps />
-          </div>
-        </section>
-      </main>
-
-      <FloatingButtons />
+function ContactInformation() {
+  return (
+    <div className="ct-left">
+      <p className="ct-kicker">LET&apos;S CONNECT</p>
+      <h2 className="ct-h2">
+        Have an Idea?
+        <br className="ct-br" /> Let&apos;s Make It Happen.
+      </h2>
+      <p className="ct-p">
+        Tell us what you&apos;re envisioning, and let&apos;s explore how we can bring it to life.
+      </p>
     </div>
   );
 }
+
+function ContactForm() {
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [status, setStatus] = useState<Status>("idle");
+  const [formError, setFormError] = useState<string | null>(null);
+  const successRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (status === "success") successRef.current?.focus();
+  }, [status]);
+
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (status === "submitting") return;
+
+    const form = e.currentTarget;
+    const values = readValues(form);
+    const found = validate(values);
+    setErrors(found);
+    setFormError(null);
+
+    const firstInvalid = FIELD_ORDER.find((k) => found[k]);
+    if (firstInvalid) {
+      (form.elements.namedItem(firstInvalid) as HTMLElement | null)?.focus();
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      await submitContact(values);
+      setStatus("success");
+    } catch (err) {
+      setStatus("error");
+      setFormError(
+        err instanceof NotConfiguredError
+          ? "Email sending is not configured yet. Please add the EmailJS keys to .env.local, or contact us by email or phone."
+          : "Something went wrong and your email was not sent. Please try again in a moment."
+      );
+    }
+  };
+
+  const onChange = (e: FormEvent<HTMLFormElement>) => {
+    const name = (e.target as HTMLInputElement).name as FieldName;
+    if (name && errors[name]) setErrors((p) => ({ ...p, [name]: undefined }));
+  };
+
+  if (status === "success") {
+    return (
+      <div className="ct-card ct-success" ref={successRef} tabIndex={-1} role="status" aria-live="polite">
+        <SentIcon />
+        <h2 className="ct-h3 ct-ok-title">Email sent successfully!</h2>
+        <p className="ct-p ct-ok-text">
+          Thank you for reaching out. We have received your message and will reply within 24 hours.
+        </p>
+        <button type="button" className="ct-ghost ct-ok-btn" onClick={() => setStatus("idle")}>
+          Send another message
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ct-card">
+      <h2 className="ct-h3">Tell Us About Your Project</h2>
+      <p className="ct-sub">Share a few details and we&apos;ll get back to you.</p>
+
+      <form onSubmit={onSubmit} onChange={onChange} noValidate aria-label="Contact form">
+        <div className="ct-row2">
+          <TextField
+            name="firstName"
+            label="First Name"
+            required
+            autoComplete="given-name"
+            placeholder=""
+            error={errors.firstName}
+          />
+          <TextField
+            name="lastName"
+            label="Last Name"
+            required
+            autoComplete="family-name"
+            placeholder=""
+            error={errors.lastName}
+          />
+        </div>
+        <TextField
+          name="email"
+          label="Email Address"
+          type="email"
+          required
+          autoComplete="email"
+          placeholder=""
+          error={errors.email}
+        />
+        <TextField
+          name="phone"
+          label="Phone Number"
+          type="tel"
+          autoComplete="tel"
+          placeholder=""
+          error={errors.phone}
+        />
+        <TextField
+          name="company"
+          label="Company Name"
+          autoComplete="organization"
+          placeholder=""
+          error={errors.company}
+        />
+        <SelectField name="service" label="Service Interested In" required error={errors.service} />
+        <TextAreaField
+          name="message"
+          label="Project Message"
+          required
+          placeholder=""
+          error={errors.message}
+        />
+
+        {formError && (
+          <p className="ct-form-error" role="alert">
+            <AlertIcon />
+            <span>{formError}</span>
+          </p>
+        )}
+
+        <button
+          type="submit"
+          className="ct-submit ct-reveal"
+          disabled={status === "submitting"}
+          aria-busy={status === "submitting"}
+        >
+          {status === "submitting" ? (
+            <>
+              <PlaneIcon />
+              Sending...
+            </>
+          ) : (
+            "Send Message"
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function CompanyLocation() {
+  const { address, mapQuery, coordinates } = COMPANY;
+
+  const embedSrc = coordinates
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${coordinates.lng - 0.008},${coordinates.lat - 0.005},${coordinates.lng + 0.008},${coordinates.lat + 0.005}&layer=mapnik&marker=${coordinates.lat},${coordinates.lng}`
+    : `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`;
+
+  const directionsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+
+  return (
+    <section className="ct-loc-section" aria-labelledby="ct-map-title">
+      <div className="ct-container ct-map-block">
+        <p className="ct-kicker">FIND US</p>
+        <h2 id="ct-map-title" className="ct-h2">
+          Let&apos;s Meet in Person.
+        </h2>
+        <p className="ct-p">
+          Great ideas often begin with a conversation. Visit us at our office in Infopark Phase 2,
+          Kochi.
+        </p>
+
+        <div className="ct-map">
+          <iframe
+            title="Map showing the Empire Ae IT Services office at Transasia Cyber Park, Infopark Phase 2, Kochi"
+            src={embedSrc}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        </div>
+
+        <div className="ct-map-foot">
+          <p className="ct-map-address">
+            <span className="ct-pin">
+              <PinIcon />
+            </span>
+            <span>{address}</span>
+          </p>
+          <a className="ct-ghost" href={directionsHref} target="_blank" rel="noopener noreferrer">
+            Open in Google Maps
+            <span className="ct-sr">(opens in a new tab)</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* =====================================================================
+   7. PAGE
+   ===================================================================== */
+
+export default function ContactPage() {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useIsoLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const ctx = gsap.context(() => {
+        const chars = gsap.utils.toArray<HTMLElement>(".ct-char");
+        gsap
+          .timeline({ defaults: { ease: "power3.out" } })
+          .from(".ct-eyebrow", { opacity: 0, duration: 0.6, ease: "power1.out" })
+          .from(chars, { opacity: 0, yPercent: 60, duration: 0.55, stagger: 0.03 }, 0.35)
+          .from(".ct-hero-p", { opacity: 0, y: 16, duration: 0.7 }, 1.0);
+
+        gsap
+          .timeline({
+            defaults: { ease: "power2.out", clearProps: "opacity,transform" },
+            scrollTrigger: { trigger: ".ct-grid", start: "top 85%", once: true },
+          })
+          .from(".ct-left > *", { opacity: 0, y: 24, duration: 0.7, stagger: 0.1 }, 0)
+          .from(".ct-card", { opacity: 0, y: 24, duration: 0.7 }, 0.1)
+          .from(".ct-card .ct-reveal", { opacity: 0, y: 14, duration: 0.5, stagger: 0.06 }, 0.3);
+
+        gsap.fromTo(
+          ".ct-grid",
+          { y: 28 },
+          {
+            y: 0,
+            ease: "none",
+            scrollTrigger: { trigger: ".ct-main", start: "top bottom", end: "top 30%", scrub: true },
+          }
+        );
+
+        gsap.from(".ct-map-block > *", {
+          opacity: 0,
+          y: 20,
+          duration: 0.6,
+          stagger: 0.08,
+          ease: "power2.out",
+          clearProps: "opacity,transform",
+          scrollTrigger: { trigger: ".ct-loc-section", start: "top 80%", once: true },
+        });
+      }, root);
+
+      return () => ctx.revert();
+    });
+
+    return () => mm.revert();
+  }, []);
+
+  return (
+    <div className="ct-page" ref={rootRef}>
+      <style dangerouslySetInnerHTML={{ __html: STYLES }} />
+
+      <ContactHero />
+
+      <section className="ct-main" aria-label="Contact Empire">
+        <div className="ct-container ct-grid">
+          <ContactInformation />
+          <ContactForm />
+        </div>
+      </section>
+
+      <CompanyLocation />
+    </div>
+  );
+}
+
+/* =====================================================================
+   8. STYLES (scoped with the "ct-" prefix)
+   ===================================================================== */
+
+const STYLES = `
+.ct-page {
+  --ct-text: #000000;
+  --ct-navy: #000000;
+  --ct-stroke: #141823;
+  --ct-line: #e5e7eb;
+  --ct-ok: #16a34a;
+  --ct-r: ${FIELD_RADIUS}px;
+  --ct-overlap: 120px;
+  --ct-radius: 64px;
+  --ct-nav: 72px;
+  background: #ffffff;
+  color: var(--ct-text);
+  overflow-x: clip;
+}
+.ct-page *, .ct-page *::before, .ct-page *::after { box-sizing: border-box; }
+.ct-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.ct-container { width: 100%; max-width: 1240px; margin: 0 auto; }
+
+/* ---------- Hero ---------- */
+.ct-hero {
+  background: #000000;
+  color: #ffffff;
+  position: relative;
+  z-index: 1;
+  padding: calc(var(--ct-nav) + clamp(40px, 5vw, 64px)) 24px calc(var(--ct-overlap) + clamp(48px, 6vw, 80px));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.ct-hero-inner { max-width: 900px; margin: 0 auto; }
+.ct-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 20px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+}
+.ct-bar { display: inline-block; width: 20px; height: 2px; background: #ffffff; }
+.ct-h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 4.6vw + 0.75rem, 4.5rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+}
+.ct-line { display: block; }
+.ct-word { display: inline-block; white-space: nowrap; }
+.ct-char { display: inline-block; will-change: transform, opacity; }
+.ct-hero-p {
+  max-width: 700px;
+  margin: 24px auto 0;
+  font-size: clamp(16px, 1.1vw + 12px, 18px);
+  line-height: 1.65;
+  color: #ffffff;
+}
+
+/* ---------- Main two-column section ---------- */
+.ct-main {
+  position: relative;
+  z-index: 2;
+  margin-top: calc(var(--ct-overlap) * -1);
+  background: #ffffff;
+  border-radius: var(--ct-radius) var(--ct-radius) 0 0;
+  padding: clamp(64px, 9vw, 120px) 24px;
+}
+.ct-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 48fr) minmax(0, 52fr);
+  gap: clamp(40px, 6vw, 90px);
+  align-items: center;
+}
+.ct-kicker {
+  margin: 0 0 18px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: #000000;
+}
+.ct-h2 {
+  margin: 0 0 24px;
+  font-size: clamp(2.25rem, 2vw + 1.6rem, 3.5rem);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ct-navy);
+}
+.ct-p {
+  max-width: 500px;
+  margin: 0 0 18px;
+  font-size: clamp(16px, 0.5vw + 14px, 18px);
+  line-height: 1.7;
+  color: #000000;
+}
+
+.ct-pin { display: inline-flex; margin-top: 3px; color: #000000; flex-shrink: 0; }
+
+/* ---------- Form card ---------- */
+.ct-card {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--ct-line);
+  border-radius: 8px;
+  padding: clamp(24px, 3vw, 36px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 14px 32px -18px rgba(0, 0, 0, 0.14);
+}
+.ct-h3 { margin: 0 0 6px; font-size: 24px; line-height: 1.25; font-weight: 700; color: var(--ct-navy); }
+.ct-sub { margin: 0 0 26px; font-size: 15px; line-height: 1.55; color: #000000; }
+
+.ct-row2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+.ct-field { margin-bottom: 18px; }
+.ct-label { display: block; margin-bottom: 7px; font-size: 14px; font-weight: 600; color: var(--ct-text); }
+.ct-req { color: var(--ct-text); }
+.ct-opt { font-weight: 400; color: #000000; }
+
+/* Field + animated border */
+.ct-ab { position: relative; }
+.ct-control {
+  display: block;
+  width: 100%;
+  padding: 13px 14px;
+  background: #ffffff;
+  border: 1px solid #d5dae1;
+  border-radius: var(--ct-r);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--ct-text);
+  outline: none;
+  transition: border-color 200ms ease;
+}
+.ct-control::placeholder { color: #000000; opacity: 0.5; }
+.ct-control:focus { border-color: #d5dae1; }
+.ct-textarea { min-height: 140px; resize: vertical; }
+.ct-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+.ct-ab.is-invalid .ct-control { border-color: #000000; }
+
+.ct-ab-svg { position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible; }
+.ct-ab-stroke {
+  fill: none;
+  stroke: var(--ct-stroke);
+  stroke-width: 2;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  stroke-dasharray: 0 100;
+}
+.ct-ab.is-active .ct-ab-stroke { animation: ct-draw 780ms cubic-bezier(0.65, 0, 0.35, 1) forwards; }
+@keyframes ct-draw {
+  from { stroke-dasharray: 0 100; }
+  to   { stroke-dasharray: 100 0; }
+}
+
+.ct-error {
+  margin: 7px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: #000000;
+}
+.ct-error::before { content: "! "; font-weight: 700; }
+
+/* Error banner with shaking icon */
+.ct-form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #000000;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: var(--ct-r);
+  animation: ct-fade-up 320ms ease both;
+}
+.ct-alert-ico { flex-shrink: 0; margin-top: 1px; animation: ct-shake 600ms ease 200ms both; }
+@keyframes ct-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px) rotate(-6deg); }
+  40% { transform: translateX(4px) rotate(6deg); }
+  60% { transform: translateX(-3px) rotate(-4deg); }
+  80% { transform: translateX(3px) rotate(4deg); }
+}
+@keyframes ct-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ct-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: var(--ct-r);
+  background: var(--ct-text);
+  color: #ffffff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background-color 250ms ease, color 250ms ease;
+}
+.ct-submit:hover:not(:disabled) { background: #141823; color: #ffffff; box-shadow: inset 0 0 0 1px #000000; }
+.ct-submit:focus-visible { outline: 2px solid #000000; outline-offset: 3px; }
+.ct-submit:disabled { opacity: 0.85; cursor: progress; }
+
+/* Flying paper plane while sending */
+.ct-plane { animation: ct-fly 1100ms ease-in-out infinite; }
+@keyframes ct-fly {
+  0%   { transform: translate(-6px, 4px) rotate(0deg); opacity: 0.6; }
+  50%  { transform: translate(6px, -4px) rotate(-8deg); opacity: 1; }
+  100% { transform: translate(-6px, 4px) rotate(0deg); opacity: 0.6; }
+}
+
+.ct-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  color: var(--ct-text);
+  border: 1px solid var(--ct-text);
+  border-radius: var(--ct-r);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 250ms ease, color 250ms ease, border-color 250ms ease;
+}
+.ct-ghost:hover { background: #000000; border-color: #000000; color: #ffffff; }
+.ct-ghost:focus-visible { outline: 2px solid #000000; outline-offset: 3px; }
+
+/* ---------- Success: "Email sent successfully!" ---------- */
+.ct-success {
+  outline: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: clamp(32px, 4vw, 48px);
+  padding-bottom: clamp(32px, 4vw, 48px);
+}
+.ct-success .ct-p { margin: 0 auto 24px; }
+.ct-ok-wrap { position: relative; width: 120px; height: 120px; margin-bottom: 22px; }
+.ct-ok-svg, .ct-ok-img { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ct-ok-ring {
+  stroke: #000000;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 60px 60px;
+  animation: ct-ring 900ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes ct-ring {
+  from { stroke-dasharray: 0 100; }
+  to   { stroke-dasharray: 100 0; }
+}
+.ct-ok-env {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ct-pop 650ms cubic-bezier(0.34, 1.56, 0.64, 1) 350ms both;
+}
+.ct-ok-body { fill: #ffffff; stroke: #000000; stroke-width: 3; }
+.ct-ok-flap {
+  stroke: #000000;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: ct-draw-line 600ms ease 750ms both;
+}
+.ct-ok-badge {
+  fill: var(--ct-ok);
+  stroke: #ffffff;
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ct-pop 600ms cubic-bezier(0.34, 1.56, 0.64, 1) 950ms both;
+}
+.ct-ok-check {
+  stroke: #ffffff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: ct-draw-line 420ms ease 1300ms both;
+}
+@keyframes ct-pop {
+  0%   { opacity: 0; transform: scale(0.4); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes ct-draw-line {
+  from { stroke-dasharray: 0 100; }
+  to   { stroke-dasharray: 100 0; }
+}
+.ct-ok-spark {
+  position: absolute;
+  left: calc(50% - 3px);
+  top: calc(50% - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #000000;
+  opacity: 0;
+  animation: ct-spark 900ms ease-out var(--d, 900ms) both;
+}
+.ct-ok-spark:nth-of-type(3n) { background: var(--ct-ok); }
+@keyframes ct-spark {
+  0%   { opacity: 1; transform: rotate(var(--a)) translateY(-58px) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateY(-92px) scale(0.3); }
+}
+.ct-ok-title { animation: ct-fade-up 600ms ease 1100ms both; }
+.ct-ok-text  { animation: ct-fade-up 600ms ease 1250ms both; }
+.ct-ok-btn   { animation: ct-fade-up 600ms ease 1400ms both; }
+
+/* ---------- Map ---------- */
+.ct-loc-section { background: #ffffff; padding: 0 24px clamp(64px, 9vw, 120px); }
+.ct-map-block { border-top: 1px solid var(--ct-line); padding-top: clamp(56px, 7vw, 96px); }
+.ct-map {
+  position: relative;
+  margin-top: 32px;
+  height: clamp(300px, 38vw, 480px);
+  border: 1px solid var(--ct-line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.ct-map iframe { display: block; width: 100%; height: 100%; border: 0; }
+.ct-map-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+}
+.ct-map-address { display: flex; gap: 10px; align-items: flex-start; margin: 0; font-size: 16px; line-height: 1.5; color: var(--ct-text); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .ct-page { --ct-overlap: 85px; --ct-radius: 46px; }
+}
+@media (max-width: 900px) {
+  .ct-grid { grid-template-columns: minmax(0, 1fr); gap: 56px; }
+}
+@media (max-width: 640px) {
+  .ct-page { --ct-overlap: 50px; --ct-radius: 32px; }
+  .ct-main, .ct-loc-section, .ct-hero { padding-left: 20px; padding-right: 20px; }
+  .ct-br { display: none; }
+  .ct-line { display: inline; }
+  .ct-row2 { grid-template-columns: minmax(0, 1fr); }
+  .ct-map-foot .ct-ghost { width: 100%; justify-content: center; }
+}
+
+/* ---------- Reduced motion: final states only, no movement ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ct-ab.is-active .ct-ab-stroke { animation: none; stroke-dasharray: 100 0; }
+  .ct-plane, .ct-alert-ico, .ct-form-error { animation: none; }
+  .ct-ok-ring, .ct-ok-env, .ct-ok-flap, .ct-ok-badge, .ct-ok-check,
+  .ct-ok-title, .ct-ok-text, .ct-ok-btn { animation: none; }
+  .ct-ok-spark { display: none; }
+  .ct-submit, .ct-ghost, .ct-control { transition: none; }
+}
+`;

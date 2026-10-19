@@ -1,1154 +1,657 @@
 "use client";
 
-import {
-    useEffect,
-    useRef,
-    useState,
-    type CSSProperties,
-    type MouseEvent as ReactMouseEvent,
-    type ReactNode,
-} from "react";
+/**
+ * Services page (Lusion-inspired concave scroll layout) – single file.
+ * Requires: next 16 (App Router), react, tailwindcss (v3.4+ or v4), gsap, lenis
+ *   npm install gsap lenis
+ * Save as app/page.tsx (or any route's page.tsx).
+ * If your layout already runs Lenis, delete the "Lenis" effect inside Page()
+ * and add `lenis.on("scroll", ScrollTrigger.update)` to your existing setup.
+ */
 
+import { useEffect, useRef, type CSSProperties } from "react";
+import Link from "next/link";
+import Lenis from "lenis";
+import "lenis/dist/lenis.css";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
-/*  Data      
-                                                                */
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
-
-const stats = [
-    { number: "9+", label: "Services offered" },
-    { number: "150+", label: "Projects completed" },
-    { number: "100%", label: "Client satisfaction" },
-];
+/* ================================================================== */
+/*  1. DATA                                                            */
+/* ================================================================== */
+type ServiceMedia =
+  | { type: "image"; src: string; alt: string }
+  | { type: "video"; src: string; poster?: string };
 
 type Service = {
-    title: string;
-    description: string;
-    tags: string[];
-    icon: string;
-    span: string;
+  slug: string;
+  title: string;
+  description: string; // short text shown on the card
+  tags: string[]; // sub-services / deliverables
+  href: string; // change to match your routes
+  bg: string; // active card background + media base colour
+  fg: string; // active text colour
+  accent: string; // placeholder artwork accent
+  shadow: number; // 0–1 shadow darkness when active
+  media?: ServiceMedia; // optional real image/video
 };
 
-const services: Service[] = [
-    {
-        title: "Web Designing",
-        description:
-            "We design visually stunning, responsive websites that reflect your brand identity and deliver smooth user experiences across all devices. Designs that don't just look good — they work smart. We create engaging, modern websites that capture attention and drive results.",
-        tags: ["UI/UX Design", "Responsive", "Brand Identity"],
-        icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
-        span: "lg:col-span-3",
-    },
-    {
-        title: "Web Development",
-        description:
-            "We build secure, scalable, and high-performance websites using the latest technologies to ensure smooth functionality and long-term growth. From concept to deployment, our web development solutions turn ideas into powerful digital platforms that drive real results.",
-        tags: ["React / Next.js", "WordPress", "Laravel"],
-        icon: "M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4",
-        span: "lg:col-span-3",
-    },
-    {
-        title: "Mobile App Development",
-        description:
-            "We develop high-quality mobile apps that are fast, secure, and scalable, delivering seamless experiences across Android and iOS platforms. From idea to launch, we build mobile applications that engage users, streamline operations, and drive business growth.",
-        tags: ["Android", "iOS", "Flutter"],
-        icon: "M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z",
-        span: "lg:col-span-2",
-    },
-    {
-        title: "Hosting & Domain",
-        description:
-            "Reliable hosting and domain solutions that ensure speed, security, and uninterrupted online presence. We provide secure hosting and easy domain management to keep your website running smoothly, always. Fast servers, regular backups, SSL included.",
-        tags: ["SSL Security", "99.9% Uptime", "Daily Backups"],
-        icon: "M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2",
-        span: "lg:col-span-2",
-    },
-    {
-        title: "Digital Marketing",
-        description:
-            "Data-driven digital marketing strategies that boost visibility, engage audiences, and grow your business online. We help brands reach the right audience, at the right time, with powerful digital marketing solutions that deliver measurable results and real ROI.",
-        tags: ["SEO", "Social Media", "Content Marketing"],
-        icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064",
-        span: "lg:col-span-2",
-    },
-    {
-        title: "E-Commerce Application",
-        description:
-            "We develop secure, scalable e-commerce applications that deliver seamless shopping experiences and drive online sales. From product listing to payment gateway, our e-commerce apps are built to convert visitors into loyal customers and maximize revenue.",
-        tags: ["WooCommerce", "Payment Gateway", "Inventory Mgmt"],
-        icon: "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z",
-        span: "lg:col-span-2",
-    },
-    {
-        title: "Software Application",
-        description:
-            "We develop custom software applications tailored to your specific business processes, ensuring efficiency, security, and scalability. Robust, high-performance software applications built with the latest technologies for seamless functionality and long-term reliability.",
-        tags: ["ERP Systems", "CRM", "Custom Software"],
-        icon: "M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18",
-        span: "lg:col-span-2",
-    },
-    {
-        title: "SEO",
-        description:
-            "We optimize your website to rank higher on search engines, driving organic traffic and increasing brand visibility. Our proven SEO strategies ensure your business is easily found by the right audience when they search for your products or services.",
-        tags: ["On-Page SEO", "Off-Page SEO", "Keyword Research"],
-        icon: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z",
-        span: "lg:col-span-2",
-    },
+/* ------------------------------------------------------------------ */
+/*  PAGE CONTENT – replace with the wording from empireae.xyz/services */
+/*  The entries below are PLACEHOLDERS, not copied from your site.     */
+/* ------------------------------------------------------------------ */
+const PAGE_TITLE = "Our Services";
+const PAGE_INTRO = "From ideas to breakthrough results, we craft powerful digital experiences that amplify your brand, captivate your audience, and turn clicks into customers.";
+const CTA_LABEL = "Start a project";
+const CTA_HREF = "/contact";
+
+
+const SERVICES: Service[] = [
+  {
+    slug: "web-design",
+    title: "Web Design",
+    description:
+      "We create stunning, responsive websites that captivate visitors and elevate your brand.",
+    tags: ["UI/UX Design", "Responsive", "Brand Identity"],
+    href: "/services/web-design",
+    bg: "#1a1411",
+    fg: "#ffedd7",
+    accent: "#e8a15a",
+    shadow: 0.9,
+  },
+  {
+    slug: "web-development",
+    title: "Web Development",
+    description:
+      "We build secure, scalable websites engineered for performance and growth.",
+    tags: ["React / Next.js", "WordPress", "Laravel"],
+    href: "/services/web-development",
+    bg: "#121414",
+    fg: "#ffffff",
+    accent: "#3dd6c6",
+    shadow: 0.9,
+  },
+  {
+    slug: "mobile-app-development",
+    title: "Mobile App Development",
+    description:
+      "We develop powerful Android and iOS apps for seamless user experiences.",
+    tags: ["Android", "iOS", "Flutter"],
+    href: "/services/mobile-app-development",
+    bg: "#E3E3F8",
+    fg: "#000000",
+    accent: "#7b7be8",
+    shadow: 0.95,
+  },
+  {
+    slug: "hosting-domain",
+    title: "Hosting & Domain",
+    description:
+      "We keep your website fast, secure, and online with reliable hosting solutions.",
+    tags: ["SSL Security", "99.9% Uptime", "Daily Backups"],
+    href: "/services/hosting-domain",
+    bg: "#EFD5D3",
+    fg: "#000000",
+    accent: "#d8554f",
+    shadow: 0.95,
+  },
+  {
+    slug: "digital-marketing",
+    title: "Digital Marketing",
+    description:
+      "We boost visibility and attract customers through result-driven digital strategies.",
+    tags: ["SEO", "Social Media", "Content Marketing"],
+    href: "/services/digital-marketing",
+    bg: "#111a13",
+    fg: "#d9f3de",
+    accent: "#5fbf7a",
+    shadow: 0.9,
+  },
+  {
+    slug: "e-commerce-application",
+    title: "E-Commerce Application",
+    description:
+      "We build seamless online stores that turn visitors into loyal customers.",
+    tags: ["WooCommerce", "Payment Gateway", "Inventory Management"],
+    href: "/services/e-commerce-application",
+    bg: "#BFE3FA",
+    fg: "#0a2540",
+    accent: "#6cb8ee",
+    shadow: 0.95,
+  },
+  {
+    slug: "software-application",
+    title: "Software Application",
+    description:
+      "We create custom software that streamlines workflows and boosts productivity.",
+    tags: ["ERP Systems", "CRM", "Custom Software"],
+    href: "/services/software-application",
+    bg: "#1a1411",
+    fg: "#ffedd7",
+    accent: "#e8a15a",
+    shadow: 0.9,
+  },
+  {
+    slug: "seo",
+    title: "SEO",
+    description:
+      "We improve search rankings, increase organic traffic, and grow your online reach.",
+    tags: ["On-Page SEO", "Off-Page SEO", "Keyword Optimization"],
+    href: "/services/seo",
+    bg: "#121414",
+    fg: "#ffffff",
+    accent: "#3dd6c6",
+    shadow: 0.9,
+  },
 ];
 
-const allTags = services.flatMap((s) => s.tags);
-const tagsRowA = allTags.slice(0, Math.ceil(allTags.length / 2));
-const tagsRowB = allTags.slice(Math.ceil(allTags.length / 2));
 
-/* -------------------------------------------------------------------------- */
-/*  Styles (keyframes, custom effects)                                        */
-/* -------------------------------------------------------------------------- */
+/* ================================================================== */
+/*  2. CURVE CONFIG (distances are % of the card's own size)           */
+/* ================================================================== */
+/**
+ * Concave "bowl" curve. Each card is positioned on the inside of a large
+ * cylinder (and, on desktop, a second one for the two columns):
+ *   d = -1 (card at top edge) … 0 (viewport centre) … +1 (bottom edge)
+ * Cards at the centre sit flat and furthest away; cards toward the edges
+ * swing forward and tilt so they face the centre of the viewport.
+ */
+type CurveConfig = {
+  tiltX: number; // degrees of rotateX at the viewport edge (faces the centre)
+  tiltY: number; // degrees of rotateY toward the centre (two-column layout)
+  depth: number; // px the edges come toward the viewer (concave depth)
+  pull: number; // % of card height edge cards are pulled toward the centre
+  inward: number; // % of card width edge cards slide toward the centre line
+  scrub: number; // smoothing, seconds
+  perspective: number;
+};
+type CurveBreakpoints = Record<"desktop" | "tablet" | "mobile", CurveConfig>;
 
-const STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=DM+Sans:wght@400;500;600;700&display=swap');
+const DEFAULT_CURVE: CurveBreakpoints = {
+  desktop: { tiltX: 16, tiltY: 9, depth: 170, pull: 5, inward: 4, scrub: 0.9, perspective: 1300 },
+  tablet: { tiltX: 11, tiltY: 0, depth: 110, pull: 3, inward: 0, scrub: 0.7, perspective: 1100 },
+  mobile: { tiltX: 6, tiltY: 0, depth: 45, pull: 1.5, inward: 0, scrub: 0.5, perspective: 900 },
+};
 
-@property --sv-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+const STEPS = 28;
+const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
+const WIDTH = "w-[min(100%,520px)] md:w-[min(76%,720px)] lg:w-[min(72vw,1120px)]";
 
-.sv-root {
-  --ink: #222831;
-  --deep: #31363F;
-  --cyan: #76ABAE;
-  --cyan-2: #76ABAE;
-  --cyan-3: #9CC5C8;
-  --mist: #B3B8BD;
-  background: var(--ink);
-  color: #EEEEEE;
-  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  overflow-x: clip;
-}
-.sv-display {
-  font-family: 'Bricolage Grotesque', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.035em;
-}
-
-/* ---------- keyframes ---------- */
-@keyframes sv-spin { to { transform: rotate(360deg); } }
-@keyframes sv-rise { from { transform: translateY(110%); } to { transform: translateY(0); } }
-@keyframes sv-fade { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-@keyframes sv-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
-@keyframes sv-pulse { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.08); opacity: 1; } }
-@keyframes sv-ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(2.2); opacity: 0; } }
-@keyframes sv-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@keyframes sv-marquee-rev { from { transform: translateX(-50%); } to { transform: translateX(0); } }
-@keyframes sv-shimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
-@keyframes sv-draw { to { stroke-dashoffset: 0; } }
-@keyframes sv-ken { from { transform: scale(1.05); } to { transform: scale(1.18) translate(-1.5%, -1%); } }
-@keyframes sv-drift-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(60px,40px) scale(1.15); } }
-@keyframes sv-drift-b { 0%,100% { transform: translate(0,0) scale(1.1); } 50% { transform: translate(-70px,-30px) scale(.95); } }
-@keyframes sv-drift-c { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px,-60px); } }
-@keyframes sv-scroll-dot { 0% { transform: translateY(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(14px); opacity: 0; } }
-@keyframes sv-twinkle { 0%,100% { opacity: .15; transform: translateY(0); } 50% { opacity: .9; transform: translateY(-18px); } }
-@keyframes sv-sweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
-
-/* ---------- scroll progress ---------- */
-.sv-progress {
-  background: linear-gradient(90deg, var(--cyan), var(--cyan-3), #B9D6D8);
-  box-shadow: 0 0 14px rgba(118,171,174,.8);
+/** side: -1 = left column, +1 = right column, 0 = single column. */
+function sample(t: number, side: number, c: CurveConfig) {
+  const d = 1 - 2 * t; // +1 below centre … -1 above centre
+  const arc = d * (Math.PI / 2);
+  return {
+    rotationX: d * c.tiltX,
+    rotationY: -side * Math.abs(d) * c.tiltY * 0.6 - side * c.tiltY * 0.4,
+    z: c.depth * (1 - Math.cos(arc)),
+    yPercent: -Math.sin(arc) * c.pull,
+    xPercent: -side * (1 - Math.cos(arc)) * c.inward,
+  };
 }
 
-/* ---------- reveal on scroll ---------- */
-.sv-reveal {
-  opacity: 0;
-  transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1);
-  will-change: transform, opacity;
-}
-.sv-from-up { transform: translateY(56px); }
-.sv-from-left { transform: translateX(-64px); }
-.sv-from-right { transform: translateX(64px); }
-.sv-from-scale { transform: scale(.88); }
-.sv-reveal.sv-in { opacity: 1; transform: none; }
-
-/* ---------- headline word-rise ---------- */
-.sv-word { display: inline-block; overflow: hidden; vertical-align: bottom; padding: 0 .06em .14em; margin: 0 -.06em -.14em; }
-.sv-word > span {
-  display: inline-block;
-  transform: translateY(110%);
-  animation: sv-rise 1s cubic-bezier(.16,1,.3,1) forwards;
-  animation-delay: var(--d, 0ms);
-}
-.sv-reveal-words .sv-word > span { animation-play-state: paused; }
-.sv-reveal-words.sv-in .sv-word > span { animation-play-state: running; }
-
-.sv-grad-text {
-  background: linear-gradient(100deg, #B9D6D8 0%, #76ABAE 30%, #EEEEEE 55%, #76ABAE 80%, #B9D6D8 100%);
-  background-size: 200% auto;
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: transparent;
-  animation: sv-shimmer 6s linear infinite;
+function buildCurve(el: HTMLElement, side: number, c: CurveConfig) {
+  // Trigger on the <li> so the animated transform never feeds back into
+  // ScrollTrigger's start/end measurements.
+  const trigger = el.closest("li") ?? el;
+  gsap.set(el, { ...sample(0, side, c), transformPerspective: c.perspective, force3D: true });
+  const tl = gsap.timeline({
+    defaults: { ease: "none" },
+    scrollTrigger: { trigger, start: "top bottom", end: "bottom top", scrub: c.scrub },
+  });
+  for (let k = 1; k <= STEPS; k++) tl.to(el, { ...sample(k / STEPS, side, c), duration: 1 });
 }
 
-.sv-fade-in { opacity: 0; animation: sv-fade .9s cubic-bezier(.16,1,.3,1) forwards; animation-delay: var(--d, 0ms); }
-
-/* ---------- hero ---------- */
-.sv-hero {
-  background:
-    radial-gradient(700px circle at var(--mx, 70%) var(--my, 30%), rgba(118,171,174,.16), transparent 60%),
-    linear-gradient(180deg, #31363F 0%, var(--ink) 100%);
-}
-.sv-grid-bg {
-  background-image:
-    linear-gradient(rgba(118,171,174,.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(118,171,174,.07) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 75%);
-  mask-image: radial-gradient(ellipse at 50% 40%, #000 20%, transparent 75%);
-}
-.sv-parallax { transition: transform .5s cubic-bezier(.16,1,.3,1); }
-.sv-blob { border-radius: 9999px; filter: blur(80px); }
-.sv-blob-a { animation: sv-drift-a 16s ease-in-out infinite; }
-.sv-blob-b { animation: sv-drift-b 20s ease-in-out infinite; }
-.sv-blob-c { animation: sv-drift-c 14s ease-in-out infinite; }
-.sv-dot { position: absolute; border-radius: 9999px; background: #B9D6D8; animation: sv-twinkle var(--dur, 8s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
-
-.sv-live-dot { position: relative; width: 8px; height: 8px; border-radius: 9999px; background: var(--cyan-3); }
-.sv-live-dot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--cyan-3); animation: sv-ping 1.8s ease-out infinite; }
-
-.sv-mouse { width: 24px; height: 38px; border: 2px solid rgba(238,238,238,.35); border-radius: 9999px; position: relative; }
-.sv-mouse::after { content: ''; position: absolute; left: 50%; top: 7px; width: 4px; height: 7px; margin-left: -2px; border-radius: 9999px; background: var(--cyan-3); animation: sv-scroll-dot 1.8s ease-in-out infinite; }
-
-/* ---------- orbit (hero centrepiece) ---------- */
-.sv-orbit { container-type: inline-size; position: relative; width: 100%; max-width: 500px; aspect-ratio: 1; margin-inline: auto; }
-.sv-orbit-path { position: absolute; border-radius: 9999px; border: 1px dashed rgba(118,171,174,.28); }
-.sv-ring { position: absolute; inset: 0; animation: sv-spin var(--dur) linear infinite; }
-.sv-ring-outer { --dur: 56s; }
-.sv-ring-inner { --dur: 38s; animation-direction: reverse; }
-.sv-orbit-item {
-  position: absolute; top: 50%; left: 50%;
-  width: var(--s); height: var(--s);
-  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
-  transform: rotate(var(--a)) translateX(var(--r)) rotate(calc(var(--a) * -1));
-}
-.sv-orbit-counter { width: 100%; height: 100%; }
-.sv-ring-outer .sv-orbit-counter { animation: sv-spin 56s linear infinite reverse; }
-.sv-ring-inner .sv-orbit-counter { animation: sv-spin 38s linear infinite; }
-.sv-orbit:hover .sv-ring,
-.sv-orbit:hover .sv-orbit-counter { animation-play-state: paused; }
-.sv-orbit-icon {
-  position: relative; width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 28%;
-  color: var(--cyan-3);
-  background: linear-gradient(145deg, rgba(118,171,174,.22), rgba(49,54,63,.92));
-  border: 1px solid rgba(118,171,174,.35);
-  box-shadow: 0 0 24px rgba(118,171,174,.25), inset 0 1px 0 rgba(238,238,238,.12);
-  backdrop-filter: blur(6px);
-  transition: transform .35s cubic-bezier(.16,1,.3,1), background .3s, color .3s, box-shadow .3s;
-}
-.sv-orbit-icon svg { width: 46%; height: 46%; }
-.sv-orbit-icon:hover { transform: scale(1.22); background: var(--cyan); color: #222831; box-shadow: 0 0 40px rgba(118,171,174,.8); z-index: 5; }
-.sv-tip {
-  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%) translateY(-4px);
-  white-space: nowrap; font-size: 12px; font-weight: 600; color: #EEEEEE;
-  background: #222831; border: 1px solid rgba(118,171,174,.45); border-radius: 8px; padding: 5px 10px;
-  opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
-}
-.sv-orbit-icon:hover .sv-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
-.sv-core {
-  position: absolute; top: 50%; left: 50%; width: 26cqw; height: 26cqw; margin: -13cqw 0 0 -13cqw;
-  border-radius: 9999px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 35% 30%, #B9D6D8 0%, #76ABAE 40%, #4A7578 100%);
-  box-shadow: 0 0 80px rgba(118,171,174,.6), inset 0 -10px 30px rgba(0,0,0,.35);
-  animation: sv-pulse 4s ease-in-out infinite;
-  color: #222831;
-}
-.sv-core::before, .sv-core::after {
-  content: ''; position: absolute; inset: 0; border-radius: inherit;
-  border: 1px solid rgba(118,171,174,.6); animation: sv-ping 3.2s ease-out infinite;
-}
-.sv-core::after { animation-delay: 1.6s; }
-
-/* ---------- marquee ---------- */
-.sv-marquee-wrap {
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
-}
-.sv-marquee { display: flex; width: max-content; animation: sv-marquee 45s linear infinite; }
-.sv-marquee-rev { animation-name: sv-marquee-rev; animation-duration: 55s; }
-.sv-marquee-wrap:hover .sv-marquee { animation-play-state: paused; }
-.sv-chip {
-  margin-right: .75rem; padding: .55rem 1.1rem; border-radius: 9999px; white-space: nowrap;
-  font-size: .9rem; font-weight: 500; color: var(--mist);
-  border: 1px solid rgba(118,171,174,.18); background: rgba(238,238,238,.02);
-  transition: color .3s, border-color .3s, background .3s;
-}
-.sv-chip:hover { color: #EEEEEE; border-color: var(--cyan-3); background: rgba(118,171,174,.14); }
-
-/* ---------- stats ---------- */
-.sv-stat-sweep::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(100deg, transparent 30%, rgba(238,238,238,.14) 50%, transparent 70%);
-  animation: sv-sweep 6s ease-in-out infinite;
-  pointer-events: none;
+/* Active-card state lives in data attributes (no React re-renders):
+   the active card expands, the others dim, and the whole section
+   takes on the active service's colours. */
+function activateCard(root: HTMLElement, cards: HTMLElement[], card: HTMLElement) {
+  cards.forEach((c) => {
+    c.dataset.active = c === card ? "true" : "false";
+    c.dataset.dim = c === card ? "false" : "true";
+  });
+  root.dataset.hot = "true";
+  root.style.setProperty("--fw-sbg", card.style.getPropertyValue("--fw-bg"));
+  root.style.setProperty("--fw-sfg", card.style.getPropertyValue("--fw-fg"));
 }
 
-/* ---------- service cards ---------- */
-.sv-card {
-  --mx: 50%; --my: 50%; --rx: 0deg; --ry: 0deg;
-  position: relative; isolation: isolate; overflow: hidden;
-  border-radius: 1.5rem;
-  background: linear-gradient(160deg, #353b46, #2c323b);
-  border: 1px solid rgba(118,171,174,.14);
-  transform: perspective(1000px) rotateX(var(--rx)) rotateY(var(--ry));
-  transition: transform .25s ease-out, border-color .4s, box-shadow .4s;
-  transform-style: preserve-3d;
-}
-.sv-card.sv-leaving { transition: transform .7s cubic-bezier(.16,1,.3,1), border-color .4s, box-shadow .4s; }
-.sv-card:hover { border-color: transparent; box-shadow: 0 30px 70px -20px rgba(118,171,174,.35); }
-.sv-card::before {
-  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; z-index: 3; pointer-events: none;
-  background: conic-gradient(from var(--sv-angle), transparent 0 55%, var(--cyan-3) 80%, #EEEEEE 90%, transparent 100%);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  opacity: 0; transition: opacity .4s; animation: sv-spin-angle 3.5s linear infinite;
-}
-@keyframes sv-spin-angle { to { --sv-angle: 360deg; } }
-.sv-card:hover::before { opacity: 1; }
-.sv-spot {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .35s;
-  background: radial-gradient(420px circle at var(--mx) var(--my), rgba(118,171,174,.2), transparent 55%);
-}
-.sv-card:hover .sv-spot { opacity: 1; }
-.sv-card-body { position: relative; z-index: 2; transform: translateZ(30px); }
-
-.sv-icon-box {
-  position: relative; width: 3.5rem; height: 3.5rem; border-radius: 1rem;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--cyan-3); background: rgba(118,171,174,.12); border: 1px solid rgba(118,171,174,.25);
-  transition: background .4s, color .4s, transform .5s cubic-bezier(.34,1.56,.64,1), box-shadow .4s;
-}
-.sv-card:hover .sv-icon-box { background: var(--cyan); color: #222831; transform: rotate(-8deg) scale(1.12); box-shadow: 0 0 30px rgba(118,171,174,.7); }
-.sv-draw path { stroke-dasharray: 1; stroke-dashoffset: 1; }
-.sv-in .sv-draw path { animation: sv-draw 1.6s cubic-bezier(.65,0,.35,1) forwards .35s; }
-
-.sv-tag { transition: transform .3s cubic-bezier(.34,1.56,.64,1), background .3s, color .3s, border-color .3s; }
-.sv-card:hover .sv-tag { border-color: rgba(118,171,174,.45); }
-.sv-tag:hover { transform: translateY(-3px); background: rgba(118,171,174,.2); color: #EEEEEE; }
-
-.sv-link { position: relative; }
-.sv-link::after { content: ''; position: absolute; left: 0; bottom: -2px; height: 2px; width: 100%; background: var(--cyan-3); transform: scaleX(0); transform-origin: left; transition: transform .4s cubic-bezier(.16,1,.3,1); }
-.sv-link:hover::after, .sv-link:focus-visible::after { transform: scaleX(1); }
-
-/* ---------- CTA ---------- */
-.sv-cta { background: linear-gradient(135deg, #31363F 0%, #222831 100%); }
-.sv-cta-ring {
-  position: absolute; left: 50%; top: 50%; width: 900px; height: 900px; margin: -450px 0 0 -450px; border-radius: 9999px; opacity: .5;
-  background: conic-gradient(from 0deg, transparent 0 60%, rgba(118,171,174,.35) 78%, transparent 100%);
-  -webkit-mask-image: radial-gradient(circle, transparent 38%, #000 39%, #000 40%, transparent 41%, transparent 58%, #000 59%, #000 60%, transparent 61%);
-  mask-image: radial-gradient(circle, transparent 38%, #000 39%, #000 40%, transparent 41%, transparent 58%, #000 59%, #000 60%, transparent 61%);
-  animation: sv-spin 24s linear infinite;
-}
-.sv-btn-primary {
-  position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: .75rem;
-  border-radius: 9999px; padding: 1rem 2.25rem; font-weight: 700; color: #222831;
-  background: linear-gradient(100deg, #76ABAE, #B9D6D8, #76ABAE); background-size: 200% auto;
-  box-shadow: 0 10px 40px rgba(118,171,174,.45);
-  transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .3s, background-position .6s;
-}
-.sv-btn-primary:hover { background-position: 100% 0; box-shadow: 0 16px 56px rgba(118,171,174,.65); }
-.sv-btn-primary::after {
-  content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: 0;
-  background: linear-gradient(100deg, transparent, rgba(238,238,238,.65), transparent);
-  animation: sv-sweep 3.2s ease-in-out infinite;
-}
-.sv-btn-ghost {
-  display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 1rem 2.25rem; font-weight: 700; color: #EEEEEE;
-  border: 1px solid rgba(238,238,238,.3); background: rgba(238,238,238,.03);
-  transition: transform .25s cubic-bezier(.16,1,.3,1), background .3s, border-color .3s;
-}
-.sv-btn-ghost:hover { background: rgba(238,238,238,.1); border-color: rgba(238,238,238,.6); }
-
-/* ---------- focus + reduced motion ---------- */
-.sv-root a:focus-visible { outline: 2px solid var(--cyan-3); outline-offset: 4px; border-radius: 8px; }
-
-@media (prefers-reduced-motion: reduce) {
-  .sv-root *, .sv-root *::before, .sv-root *::after {
-    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
-    transition-duration: .001ms !important; scroll-behavior: auto !important;
-  }
-  .sv-reveal { opacity: 1 !important; transform: none !important; }
-  .sv-word > span { transform: none !important; }
-  .sv-fade-in { opacity: 1 !important; }
-  .sv-draw path { stroke-dashoffset: 0 !important; }
-}
-`;
-
-/* -------------------------------------------------------------------------- */
-/*  Hooks & helpers                                                           */
-/* -------------------------------------------------------------------------- */
-
-function useInView<T extends HTMLElement>(threshold = 0.15) {
-    const ref = useRef<T>(null);
-    const [inView, setInView] = useState(false);
-
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setInView(true);
-                    observer.disconnect();
-                }
-            },
-            { threshold, rootMargin: "0px 0px -6% 0px" }
-        );
-
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [threshold]);
-
-    return { ref, inView };
+function deactivateCard(root: HTMLElement, cards: HTMLElement[], card: HTMLElement) {
+  card.dataset.active = "false";
+  if (cards.some((c) => c.dataset.active === "true")) return; // another card took over
+  cards.forEach((c) => (c.dataset.dim = "false"));
+  root.dataset.hot = "false";
+  root.style.removeProperty("--fw-sbg");
+  root.style.removeProperty("--fw-sfg");
 }
 
-type Direction = "up" | "left" | "right" | "scale";
-
-function Reveal({
-    children,
-    delay = 0,
-    from = "up",
-    className = "",
-}: {
-    children: ReactNode;
-    delay?: number;
-    from?: Direction;
-    className?: string;
-}) {
-    const { ref, inView } = useInView<HTMLDivElement>();
-    return (
-        <div
-            ref={ref}
-            className={`sv-reveal sv-from-${from} ${inView ? "sv-in" : ""} ${className}`}
-            style={{ transitionDelay: `${delay}ms` }}
-        >
-            {children}
-        </div>
-    );
-}
-
-/** Splits text into words that rise out of a mask, one after another. */
-function Words({
-    text,
-    startDelay = 0,
-    step = 70,
-    className = "",
-}: {
-    text: string;
-    startDelay?: number;
-    step?: number;
-    className?: string;
-}) {
-    return (
-        <>
-            {text.split(" ").map((word, i) => (
-                <span key={`${word}-${i}`} className="sv-word">
+/* ================================================================== */
+/*  3. ROLLING TITLE                                                   */
+/* ================================================================== */
+function RollingTitle({ text }: { text: string }) {
+  const words = text.split(" ");
+  let index = 0;
+  return (
+    <span className="block">
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true" className="block">
+        {words.map((word, w) => (
+          <span key={w}>
+            <span className="inline-flex whitespace-nowrap">
+              {Array.from(word).map((ch, c) => {
+                const i = index++;
+                return (
+                  <span key={c} className="inline-block h-[1.25em] overflow-hidden leading-[1.25em]">
                     <span
-                        className={className}
-                        style={{ "--d": `${startDelay + i * step}ms` } as CSSProperties}
+                      className={`block transition-transform duration-500 ${EASE} group-data-[active=true]:-translate-y-1/2 motion-reduce:transition-none`}
+                      style={{ transitionDelay: `${i * 18}ms` }}
                     >
-                        {word}&nbsp;
+                      <span className="block">{ch}</span>
+                      <span className="block">{ch}</span>
                     </span>
-                </span>
-            ))}
-        </>
-    );
+                  </span>
+                );
+              })}
+            </span>
+            {w < words.length - 1 && <span className="inline-block w-[0.3em]" />}
+          </span>
+        ))}
+      </span>
+    </span>
+  );
 }
 
-/** Same as Words, but triggers when scrolled into view. */
-function WordsOnView({
-    text,
-    className = "",
-    wordClassName = "",
-}: {
-    text: string;
-    className?: string;
-    wordClassName?: string;
-}) {
-    const { ref, inView } = useInView<HTMLHeadingElement>(0.3);
+/* ================================================================== */
+/*  4. MEDIA (real media or CSS artwork)                               */
+/* ================================================================== */
+function ServiceMediaView({ service, index }: { service: Service; index: number }) {
+  const { media, bg, fg, accent, title } = service;
+
+  if (media?.type === "image") {
     return (
-        <span
-            ref={ref}
-            className={`sv-reveal-words ${inView ? "sv-in" : ""} ${className}`}
-        >
-            <Words text={text} className={wordClassName} />
-        </span>
+      <div
+        role="img"
+        aria-label={media.alt}
+        className="size-full bg-cover bg-center"
+        style={{ backgroundColor: bg, backgroundImage: `url(${media.src})` }}
+      />
     );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Small components                                                          */
-/* -------------------------------------------------------------------------- */
-
-function ScrollProgress() {
-    const barRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        let raf = 0;
-        const update = () => {
-            const doc = document.documentElement;
-            const max = doc.scrollHeight - doc.clientHeight;
-            const p = max > 0 ? doc.scrollTop / max : 0;
-            if (barRef.current) barRef.current.style.transform = `scaleX(${p})`;
-            raf = 0;
-        };
-        const onScroll = () => {
-            if (!raf) raf = requestAnimationFrame(update);
-        };
-        update();
-        window.addEventListener("scroll", onScroll, { passive: true });
-        return () => {
-            window.removeEventListener("scroll", onScroll);
-            if (raf) cancelAnimationFrame(raf);
-        };
-    }, []);
-
+  }
+  if (media?.type === "video") {
     return (
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.75">
+      <video
+        className="size-full object-cover"
+        src={media.src}
+        poster={media.poster}
+        autoPlay
+        muted
+        loop
+        playsInline
+        aria-label={`${title} preview`}
+      />
+    );
+  }
+
+  const variant = index % 3;
+  const fgSoft = `color-mix(in srgb, ${fg} 22%, transparent)`;
+  const blob = (x: string, y: string, size: string, color: string): CSSProperties => ({
+    left: x,
+    top: y,
+    width: size,
+    height: size,
+    background: `radial-gradient(circle at 35% 35%, ${color}, transparent 65%)`,
+  });
+
+  return (
+    <div className="relative size-full overflow-hidden" style={{ backgroundColor: bg }} aria-hidden="true">
+      <div className="fw-drift-a absolute rounded-full blur-2xl" style={blob("-8%", "-20%", "70%", accent)} />
+      <div
+        className="fw-drift-b absolute rounded-full opacity-70 blur-3xl"
+        style={blob("45%", "30%", "65%", `color-mix(in srgb, ${accent} 60%, ${fg})`)}
+      />
+      {variant === 0 && (
+        <div
+          className="absolute left-1/2 top-1/2 aspect-square w-[34%] -translate-x-1/2 -translate-y-1/2 rounded-full border"
+          style={{ borderColor: fgSoft, boxShadow: `0 0 0 clamp(14px,2.4vw,40px) ${fgSoft}` }}
+        />
+      )}
+      {variant === 1 && (
+        <div
+          className="absolute left-1/2 top-1/2 aspect-square w-[30%] -translate-x-1/2 -translate-y-1/2 rotate-12 rounded-[28%] border"
+          style={{ borderColor: fgSoft, background: `linear-gradient(135deg, ${fgSoft}, transparent)` }}
+        />
+      )}
+      {variant === 2 && (
+        <div className="absolute inset-x-[18%] bottom-[14%] flex h-[46%] items-end gap-[3%]">
+          {[0.45, 0.8, 0.62, 1, 0.55].map((h, i) => (
             <div
-                ref={barRef}
-                className="sv-progress h-full origin-left"
-                style={{ transform: "scaleX(0)" }}
+              key={i}
+              className="flex-1 rounded-t-full border"
+              style={{ height: `${h * 100}%`, borderColor: fgSoft, background: `linear-gradient(to top, ${fgSoft}, transparent)` }}
             />
+          ))}
         </div>
-    );
+      )}
+    </div>
+  );
 }
 
-function AnimatedCounter({
-    value,
-    duration = 2200,
-}: {
-    value: string;
-    duration?: number;
-}) {
-    const { ref, inView } = useInView<HTMLSpanElement>(0.5);
-    const [count, setCount] = useState(0);
-
-    useEffect(() => {
-        if (!inView) return;
-        const target = parseInt(value.replace(/\D/g, ""), 10);
-        const start = performance.now();
-        let frame = 0;
-
-        const tick = (now: number) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 4);
-            setCount(Math.round(eased * target));
-            if (progress < 1) frame = requestAnimationFrame(tick);
-        };
-
-        frame = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frame);
-    }, [inView, value, duration]);
-
-    const suffix = value.replace(/[0-9]/g, "");
-
-    return (
-        <span ref={ref}>
-            {count}
-            {suffix}
-        </span>
-    );
-}
-
-function Marquee({ items, reverse = false }: { items: string[]; reverse?: boolean }) {
-    const row = [...items, ...items];
-    return (
-        <div className="sv-marquee-wrap">
-            <div className={`sv-marquee ${reverse ? "sv-marquee-rev" : ""}`}>
-                {row.map((tag, i) => (
-                    <span key={`${tag}-${i}`} className="sv-chip">
-                        {tag}
-                    </span>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function Magnetic({
-    href,
-    className,
-    children,
-}: {
-    href: string;
-    className: string;
-    children: ReactNode;
-}) {
-    const ref = useRef<HTMLAnchorElement>(null);
-
-    const onMove = (e: ReactMouseEvent<HTMLAnchorElement>) => {
-        const el = ref.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const dx = (e.clientX - (r.left + r.width / 2)) * 0.28;
-        const dy = (e.clientY - (r.top + r.height / 2)) * 0.28;
-        el.style.transform = `translate(${dx}px, ${dy}px)`;
-    };
-    const onLeave = () => {
-        if (ref.current) ref.current.style.transform = "";
-    };
-
-    return (
-        <a
-            ref={ref}
-            href={href}
-            className={className}
-            onMouseMove={onMove}
-            onMouseLeave={onLeave}
-        >
-            {children}
-        </a>
-    );
-}
-
-function ArrowIcon({ className = "h-5 w-5" }: { className?: string }) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-            className={className}
-            aria-hidden="true"
-        >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-7-7 7 7-7 7" />
-        </svg>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Hero orbit — services circling a glowing core                             */
-/* -------------------------------------------------------------------------- */
-
-function OrbitItem({
-    service,
-    angle,
-    radius,
-    size,
-}: {
-    service: Service;
-    angle: number;
-    radius: string;
-    size: string;
-}) {
-    return (
-        <div
-            className="sv-orbit-item"
-            style={
-                {
-                    "--a": `${angle}deg`,
-                    "--r": radius,
-                    "--s": size,
-                } as CSSProperties
-            }
-        >
-            <div className="sv-orbit-counter">
-                <div className="sv-orbit-icon">
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={1.7}
-                        aria-hidden="true"
-                    >
-                        <path strokeLinecap="round" strokeLinejoin="round" d={service.icon} />
-                    </svg>
-                    <span className="sv-tip">{service.title}</span>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function Orbit() {
-    const outer = services.slice(0, 5);
-    const inner = services.slice(5);
-
-    return (
-        <div className="sv-orbit" aria-hidden="true">
-            <div className="sv-orbit-path" style={{ inset: "10cqw" }} />
-            <div className="sv-orbit-path" style={{ inset: "26cqw" }} />
-
-            <div className="sv-ring sv-ring-outer">
-                {outer.map((s, i) => (
-                    <OrbitItem
-                        key={s.title}
-                        service={s}
-                        angle={i * (360 / outer.length) - 90}
-                        radius="40cqw"
-                        size="14cqw"
-                    />
-                ))}
-            </div>
-
-            <div className="sv-ring sv-ring-inner">
-                {inner.map((s, i) => (
-                    <OrbitItem
-                        key={s.title}
-                        service={s}
-                        angle={i * (360 / inner.length) - 30}
-                        radius="24cqw"
-                        size="12cqw"
-                    />
-                ))}
-            </div>
-
-            <div className="sv-core">
-                <span className="sv-display font-extrabold leading-none" style={{ fontSize: "8cqw" }}>
-                    9+
-                </span>
-                <span className="font-semibold" style={{ fontSize: "3cqw" }}>
-                    services
-                </span>
-            </div>
-        </div>
-    );
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Service card — 3D tilt, cursor spotlight, rotating border                 */
-/* -------------------------------------------------------------------------- */
-
+/* ================================================================== */
+/*  5. PROJECT CARD                                                    */
+/* ================================================================== */
 function ServiceCard({ service, index }: { service: Service; index: number }) {
-    const cardRef = useRef<HTMLElement>(null);
-    const { ref, inView } = useInView<HTMLDivElement>(0.12);
-    const isWide = service.span === "lg:col-span-3";
+  const style = {
+    "--fw-bg": service.bg,
+    "--fw-fg": service.fg,
+    "--fw-shadow": service.shadow,
+  } as CSSProperties;
 
-    const onMove = (e: ReactMouseEvent<HTMLElement>) => {
-        const el = cardRef.current;
-        if (!el) return;
-        el.classList.remove("sv-leaving");
-        const r = el.getBoundingClientRect();
-        const x = e.clientX - r.left;
-        const y = e.clientY - r.top;
-        el.style.setProperty("--mx", `${x}px`);
-        el.style.setProperty("--my", `${y}px`);
-        el.style.setProperty("--rx", `${(y / r.height - 0.5) * -8}deg`);
-        el.style.setProperty("--ry", `${(x / r.width - 0.5) * 8}deg`);
-    };
+  return (
+    <li className="min-w-0">
+      {/* Layer 1 – GSAP: curved scroll motion */}
+      <div data-fw-motion className="will-change-transform">
+        {/* Layer 2 – GSAP: pointer tilt (desktop only) */}
+        <div data-fw-tilt className="will-change-transform">
+          {/* Layer 3 – CSS: active / hover styling */}
+          <Link
+            href={service.href}
+            data-fw-card
+            data-active="false"
+            data-dim="false"
+            style={style}
+            className={`group block rounded-[1.1rem] bg-[color-mix(in_srgb,currentColor_7%,transparent)] p-1.5 outline-none ring-1 ring-transparent transition-[background-color,color,transform,box-shadow,opacity] duration-500 ${EASE} focus-visible:ring-2 focus-visible:ring-current data-[active=true]:scale-[1.02] data-[active=true]:bg-[var(--fw-bg)] data-[active=true]:text-[var(--fw-fg)] data-[active=true]:shadow-[0_40px_90px_-30px_rgba(0,0,0,var(--fw-shadow))] data-[active=true]:ring-[color-mix(in_srgb,var(--fw-fg)_22%,transparent)] data-[dim=true]:opacity-40 motion-reduce:transition-none sm:rounded-[1.4rem] sm:p-2`}
+          >
+            <div className="relative aspect-[16/9] overflow-hidden rounded-[0.7rem] sm:aspect-[2/1] sm:rounded-[1.05rem] lg:aspect-[2/1]">
+              <div data-fw-media-inner className="size-full will-change-transform">
+                <ServiceMediaView service={service} index={index} />
+              </div>
+              {/* pointer spotlight */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-500 group-data-[active=true]:opacity-100"
+                style={{ background: "radial-gradient(circle at var(--mx,50%) var(--my,50%), rgba(255,255,255,0.4), transparent 55%)" }}
+              />
+            </div>
 
-    const onLeave = () => {
-        const el = cardRef.current;
-        if (!el) return;
-        el.classList.add("sv-leaving");
-        el.style.setProperty("--rx", "0deg");
-        el.style.setProperty("--ry", "0deg");
-    };
+            <div className="px-2 pb-1 pt-2.5 sm:px-2.5 sm:pb-1.5 sm:pt-3">
+              <p className="text-[0.7rem] leading-snug opacity-70 sm:text-[0.8rem]">{service.tags.join(" • ")}</p>
 
-    return (
-        <div
-            ref={ref}
-            className={`sv-reveal sv-from-up h-full w-full ${
-    inView ? "sv-in" : ""
-}`}
-            style={{ transitionDelay: `${(index % 3) * 130}ms` }}
-        >
-            <article
-                ref={cardRef}
-                onMouseMove={onMove}
-                onMouseLeave={onLeave}
-                className="sv-card flex h-full flex-col p-6 sm:p-8"
-            >
-                <div className="sv-spot" aria-hidden="true" />
-
-                <div className="sv-card-body flex h-full flex-col">
-                    <div className="sv-icon-box">
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            className="sv-draw h-7 w-7"
-                            aria-hidden="true"
-                        >
-                            <path
-                                pathLength={1}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.6}
-                                d={service.icon}
-                            />
-                        </svg>
-                    </div>
-
-                    <h3
-                        className={`sv-display mt-6 font-bold leading-tight text-[#EEEEEE] ${isWide ? "text-3xl sm:text-4xl" : "text-2xl"
-                            }`}
-                    >
-                        {service.title}
-                    </h3>
-
-                    <p
-                        className={`mt-3 flex-1 leading-7 text-[#B3B8BD] ${isWide ? "max-w-xl text-base" : "text-[15px]"
-                            }`}
-                    >
-                        {service.description}
-                    </p>
-
-                    <div className="mt-6 flex flex-wrap gap-2">
-                        {service.tags.map((tag) => (
-                            <span
-                                key={tag}
-                                className="sv-tag rounded-full border border-[#76ABAE]/20 bg-[#76ABAE]/8 px-3 py-1.5 text-xs font-medium text-[#A9CCCE]"
-                            >
-                                {tag}
-                            </span>
-                        ))}
-                    </div>
-
-                    <div className="mt-7">
-                        <a
-                            href="/contact/"
-                            className="sv-link group/cta inline-flex items-center gap-2 py-1 text-sm font-bold text-[#76ABAE]"
-                        >
-                            <span>Get started</span>
-                            <ArrowIcon className="h-4 w-4 transition-transform duration-300 group-hover/cta:translate-x-1.5" />
-                        </a>
-                    </div>
+              <div className="relative mt-1.5 text-[clamp(1.1rem,0.95rem+1vw,1.75rem)] font-medium leading-tight tracking-tight">
+                <span
+                  aria-hidden="true"
+                  className={`absolute left-0 top-[0.6em] size-[0.55em] -translate-x-3 -translate-y-1/2 rounded-full bg-current opacity-0 transition-[transform,opacity] duration-500 ${EASE} group-data-[active=true]:translate-x-0 group-data-[active=true]:opacity-100 motion-reduce:transition-none`}
+                />
+                <div
+                  className={`w-[calc(100%-0.85em)] transition-transform duration-500 ${EASE} group-data-[active=true]:translate-x-[0.85em] motion-reduce:transition-none`}
+                >
+                  <RollingTitle text={service.title} />
                 </div>
-            </article>
+                <p className="mt-2 line-clamp-2 text-[0.8rem] font-normal leading-relaxed tracking-normal opacity-70 sm:text-sm">
+                  {service.description}
+                </p>
+              </div>
+            </div>
+          </Link>
         </div>
-    );
+      </div>
+    </li>
+  );
 }
 
-/* -------------------------------------------------------------------------- */
-/*  Page                                                                      */
-/* -------------------------------------------------------------------------- */
+/* ================================================================== */
+/*  6. SECTION                                                         */
+/* ================================================================== */
+function ServicesSection({
+  services = SERVICES,
+  curve,
+  ctaHref = CTA_HREF,
+  ctaLabel = CTA_LABEL,
+}: {
+  services?: Service[];
+  curve?: Partial<{ [K in keyof CurveBreakpoints]: Partial<CurveConfig> }>;
+  ctaHref?: string;
+  ctaLabel?: string;
+}) {
+  const rootRef = useRef<HTMLElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
 
-export default function Services() {
-    const heroRef = useRef<HTMLElement>(null);
-    const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const cursor = cursorRef.current;
 
-    const onHeroMove = (e: ReactMouseEvent<HTMLElement>) => {
-        const el = heroRef.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const px = (e.clientX - r.left) / r.width;
-        const py = (e.clientY - r.top) / r.height;
-        el.style.setProperty("--mx", `${px * 100}%`);
-        el.style.setProperty("--my", `${py * 100}%`);
-        setParallax({ x: px - 0.5, y: py - 0.5 });
-    };
+    // gsap.matchMedia is a scoped context: everything created inside is
+    // reverted when a query stops matching or on mm.revert().
+    const mm = gsap.matchMedia(root);
 
-    const shift = (depth: number): CSSProperties => ({
-        transform: `translate(${parallax.x * depth}px, ${parallax.y * depth}px)`,
-    });
+    mm.add(
+      {
+        desktop: "(min-width: 1024px)",
+        tablet: "(min-width: 768px) and (max-width: 1023.98px)",
+        reduceMotion: "(prefers-reduced-motion: reduce)",
+        canHover: "(hover: hover) and (pointer: fine)",
+      },
+      (ctx) => {
+        const { desktop, tablet, reduceMotion, canHover } = ctx.conditions as Record<string, boolean>;
+        const cards = gsap.utils.toArray<HTMLElement>("[data-fw-card]");
+        const motions = gsap.utils.toArray<HTMLElement>("[data-fw-motion]");
+        const fx = !reduceMotion;
 
-    const carouselRef = useRef<HTMLDivElement>(null);
-
-useEffect(() => {
-    const container = carouselRef.current;
-    if (!container) return;
-
-    const interval = window.setInterval(() => {
-        if (container.getAttribute("data-autoplay-paused") === "true") {
-            return;
+        // 1. Curved scroll motion
+        if (fx) {
+          const key = desktop ? "desktop" : tablet ? "tablet" : "mobile";
+          const cfg = { ...DEFAULT_CURVE[key], ...curve?.[key] };
+          motions.forEach((el, i) => {
+            // Desktop is two columns: left cards lean right, right cards lean left.
+            const side = desktop ? (i % 2 === 0 ? -1 : 1) : 0;
+            buildCurve(el, side, cfg);
+          });
         }
 
-        const firstCard = container.firstElementChild as HTMLElement | null;
-        if (!firstCard) return;
+        const cleanups: Array<() => void> = [];
+        const inner = (card: HTMLElement) => card.querySelector<HTMLElement>("[data-fw-media-inner]");
 
-        const gap = 24; // gap-6 = 24px
-        const step = firstCard.getBoundingClientRect().width + gap;
-
-        const atEnd =
-            container.scrollLeft + container.clientWidth >=
-            container.scrollWidth - 10;
-
-        container.scrollTo({
-            left: atEnd ? 0 : container.scrollLeft + step,
-            behavior: "smooth",
+        if (fx) cards.forEach((card) => {
+          const m = inner(card);
+          if (m) gsap.set(m, { scale: 1.08 });
         });
-    }, 4000);
 
-    return () => window.clearInterval(interval);
-}, []);
+        if (canHover) {
+          // 2a. Mouse: hover state, 3D tilt, media parallax, "View" cursor
+          const qx = cursor && fx ? gsap.quickTo(cursor, "x", { duration: 0.35, ease: "power3" }) : null;
+          const qy = cursor && fx ? gsap.quickTo(cursor, "y", { duration: 0.35, ease: "power3" }) : null;
+          if (cursor) gsap.set(cursor, { xPercent: -50, yPercent: -50, scale: 0, autoAlpha: 0 });
 
-    return (
-        <main className="sv-root min-h-screen">
-            <style dangerouslySetInnerHTML={{ __html: STYLES }} />
-            <ScrollProgress />
+          cards.forEach((card) => {
+            const tilt = card.closest<HTMLElement>("[data-fw-tilt]");
+            const media = inner(card);
+            if (fx && tilt) gsap.set(tilt, { transformPerspective: 900 });
 
-            {/* ============================ HERO ============================ */}
-            <section
-                ref={heroRef}
-                onMouseMove={onHeroMove}
-                className="sv-hero relative isolate overflow-hidden px-6 pb-24 pt-28 sm:px-10 lg:px-16 lg:pb-32 lg:pt-36"
-            >
-                {/* Aurora blobs with mouse parallax */}
-                <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-                    <div className="sv-parallax absolute -left-32 top-0" style={shift(-50)}>
-                        <div className="sv-blob sv-blob-a h-105 w-105 bg-[#76ABAE]/30" />
-                    </div>
-                    <div className="sv-parallax absolute -right-24 top-20" style={shift(70)}>
-                        <div className="sv-blob sv-blob-b h-120 w-120 bg-[#5C6676]/30" />
-                    </div>
-                    <div className="sv-parallax absolute bottom-0 left-1/3" style={shift(-30)}>
-                        <div className="sv-blob sv-blob-c h-90 w-90 bg-[#76ABAE]/20" />
-                    </div>
-                    <div className="sv-grid-bg absolute inset-0" />
+            const rx = fx && tilt ? gsap.quickTo(tilt, "rotationX", { duration: 0.6, ease: "power3" }) : null;
+            const ry = fx && tilt ? gsap.quickTo(tilt, "rotationY", { duration: 0.6, ease: "power3" }) : null;
+            const mx = fx && media ? gsap.quickTo(media, "x", { duration: 0.6, ease: "power3" }) : null;
+            const my = fx && media ? gsap.quickTo(media, "y", { duration: 0.6, ease: "power3" }) : null;
 
-                    {Array.from({ length: 28 }).map((_, i) => (
-                        <span
-                            key={i}
-                            className="sv-dot"
-                            style={
-                                {
-                                    left: `${(i * 53 + 17) % 100}%`,
-                                    top: `${(i * 29 + 7) % 100}%`,
-                                    width: `${2 + (i % 3)}px`,
-                                    height: `${2 + (i % 3)}px`,
-                                    "--dur": `${6 + (i % 5) * 2}s`,
-                                    "--delay": `-${i % 7}s`,
-                                } as CSSProperties
-                            }
-                        />
-                    ))}
-                </div>
+            const enter = (e: PointerEvent | FocusEvent) => {
+              activateCard(root, cards, card);
+              if (!fx) return;
+              if (media) gsap.to(media, { scale: 1.14, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              if (cursor && e instanceof PointerEvent) {
+                cursor.style.background = card.style.getPropertyValue("--fw-fg");
+                cursor.style.color = card.style.getPropertyValue("--fw-bg");
+                if (gsap.getProperty(cursor, "autoAlpha") === 0) gsap.set(cursor, { x: e.clientX, y: e.clientY });
+                gsap.to(cursor, { scale: 1, autoAlpha: 1, duration: 0.4, ease: "power3.out", overwrite: "auto" });
+                card.style.cursor = "none";
+              }
+            };
 
-                <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.15fr_1fr]">
-                    {/* Copy */}
-                    <div>
-                        <nav
-                            aria-label="Breadcrumb"
-                            className="sv-fade-in mb-8 flex items-center gap-3 text-sm"
-                            style={{ "--d": "100ms" } as CSSProperties}
-                        >
-                            <a href="/" className="font-medium text-[#8A9299] transition-colors hover:text-[#EEEEEE]">
-                                Home
-                            </a>
-                            <span className="text-[#5A626B]">/</span>
-                            <span className="text-[#EEEEEE]">Services</span>
-                        </nav>
+            const move = (e: PointerEvent) => {
+              const r = card.getBoundingClientRect();
+              const nx = (e.clientX - r.left) / r.width - 0.5;
+              const ny = (e.clientY - r.top) / r.height - 0.5;
+              card.style.setProperty("--mx", `${(nx + 0.5) * 100}%`);
+              card.style.setProperty("--my", `${(ny + 0.5) * 100}%`);
+              ry?.(nx * 7);
+              rx?.(-ny * 7);
+              mx?.(-nx * 12);
+              my?.(-ny * 12);
+              qx?.(e.clientX);
+              qy?.(e.clientY);
+            };
 
-                        <div
-                            className="sv-fade-in mb-7 inline-flex items-center gap-3 rounded-full border border-[#76ABAE]/30 bg-[#76ABAE]/10 px-5 py-2 text-sm font-semibold text-[#B9D6D8]"
-                            style={{ "--d": "250ms" } as CSSProperties}
-                        >
-                            <span className="sv-live-dot" />
-                            What we do
-                        </div>
+            const leave = () => {
+              deactivateCard(root, cards, card);
+              card.style.cursor = "";
+              if (!fx) return;
+              rx?.(0);
+              ry?.(0);
+              mx?.(0);
+              my?.(0);
+              if (media) gsap.to(media, { scale: 1.08, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              if (cursor) gsap.to(cursor, { scale: 0, autoAlpha: 0, duration: 0.3, ease: "power3.in", overwrite: "auto" });
+            };
 
-                        <h1 className="sv-display text-5xl font-extrabold leading-[1.02] text-[#EEEEEE] sm:text-6xl xl:text-7xl">
-                            <span className="block">
-                                <Words text="Smart Services for a" startDelay={350} />
-                            </span>
-                            <span className="block">
-                                <Words
-                                    text="Smarter Digital Future"
-                                    startDelay={800}
-                                    className="sv-grad-text"
-                                />
-                            </span>
-                        </h1>
+            const focusOn = () => activateCard(root, cards, card);
+            const focusOff = () => deactivateCard(root, cards, card);
 
-                        <p
-                            className="sv-fade-in mt-8 max-w-xl text-lg leading-8 text-[#B3B8BD]"
-                            style={{ "--d": "1500ms" } as CSSProperties}
-                        >
-                            From concept to launch and beyond — we provide every digital
-                            service your business needs to succeed in the modern world.
-                        </p>
+            card.addEventListener("pointerenter", enter);
+            card.addEventListener("pointermove", move);
+            card.addEventListener("pointerleave", leave);
+            card.addEventListener("focus", focusOn);
+            card.addEventListener("blur", focusOff);
+            cleanups.push(() => {
+              card.removeEventListener("pointerenter", enter);
+              card.removeEventListener("pointermove", move);
+              card.removeEventListener("pointerleave", leave);
+              card.removeEventListener("focus", focusOn);
+              card.removeEventListener("blur", focusOff);
+              card.style.cursor = "";
+              deactivateCard(root, cards, card);
+            });
+          });
+        } else {
+          // 2b. Touch: the card nearest the middle of the screen becomes active
+          cards.forEach((card) => {
+            const media = inner(card);
+            ScrollTrigger.create({
+              trigger: card,
+              start: "center 65%",
+              end: "center 35%",
+              onToggle: (self) => {
+                if (self.isActive) activateCard(root, cards, card);
+                else deactivateCard(root, cards, card);
+                if (fx && media) gsap.to(media, { scale: self.isActive ? 1.14 : 1.08, duration: 0.8, ease: "power3.out", overwrite: "auto" });
+              },
+            });
+            cleanups.push(() => deactivateCard(root, cards, card));
+          });
+        }
 
-                        <div
-                            className="sv-fade-in mt-10 flex flex-wrap items-center gap-5"
-                            style={{ "--d": "1700ms" } as CSSProperties}
-                        >
-                            <Magnetic href="/contact/" className="sv-btn-primary">
-                                <span className="relative z-10">Start a project</span>
-                                <ArrowIcon className="relative z-10 h-5 w-5" />
-                            </Magnetic>
-                            <a
-                                href="#services"
-                                className="sv-link text-sm font-semibold text-[#EEEEEE]/80 transition-colors hover:text-[#EEEEEE]"
-                            >
-                                Browse all services
-                            </a>
-                        </div>
-                    </div>
-
-                    {/* Orbit centrepiece */}
-                    <div
-                        className="sv-fade-in sv-parallax"
-                        style={{ "--d": "900ms", ...shift(18) } as CSSProperties}
-                    >
-                        <div style={{ animation: "sv-float 9s ease-in-out infinite" }}>
-                            <Orbit />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Scroll cue */}
-                <div
-                    className="sv-fade-in absolute bottom-8 left-1/2 hidden -translate-x-1/2 lg:block"
-                    style={{ "--d": "2200ms" } as CSSProperties}
-                    aria-hidden="true"
-                >
-                    <div className="sv-mouse" />
-                </div>
-            </section>
-
-            {/* ========================= TECH MARQUEE ======================= */}
-            <section className="border-y border-[#76ABAE]/10 bg-[#1D2229] py-8" aria-label="Technologies and specialities">
-                <div className="space-y-3">
-                    <Marquee items={tagsRowA} />
-                    <Marquee items={tagsRowB} reverse />
-                </div>
-            </section>
-
-            {/* ============================ STATS =========================== */}
-            <section className="relative h-auto min-h-80 w-full overflow-hidden py-16 sm:py-0">
-                <div
-                    className="absolute inset-0 bg-cover bg-center"
-                    style={{
-                        backgroundImage: "url('/images/services.jpg')",
-                        animation: "sv-ken 24s ease-in-out infinite alternate",
-                    }}
-                />
-                <div
-                    className="absolute inset-0"
-                    style={{ background: "linear-gradient(135deg, #222831ee, #76ABAE88)" }}
-                />
-                <div className="sv-stat-sweep absolute inset-0" aria-hidden="true" />
-
-                <div className="relative z-10 mx-auto grid h-full min-h-80 max-w-6xl grid-cols-1 items-center sm:grid-cols-3">
-                    {stats.map((stat, i) => (
-                        <Reveal key={stat.label} delay={i * 150} from="scale" className="h-full">
-                            <div
-                                className={`flex h-full flex-col items-center justify-center px-6 py-8 text-center sm:py-0 ${i > 0 ? "sm:border-l sm:border-[#EEEEEE]/15" : ""
-                                    }`}
-                            >
-                                <span className="sv-display text-6xl font-extrabold text-[#EEEEEE] drop-shadow-[0_0_30px_rgba(118,171,174,.55)] sm:text-7xl">
-                                    <AnimatedCounter value={stat.number} />
-                                </span>
-                                <span className="mt-3 text-sm font-semibold tracking-wide text-[#EEEEEE]/85 sm:text-base">
-                                    {stat.label}
-                                </span>
-                            </div>
-                        </Reveal>
-                    ))}
-                </div>
-            </section>
-
-            {/* ========================== ALL SERVICES ====================== */}
-            <section
-                id="services"
-                className="relative isolate overflow-hidden px-5 py-24 sm:px-8 lg:px-12 lg:py-32"
-            >
-                <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-                    <div className="sv-blob absolute left-[-10%] top-[20%] h-96 w-96 bg-[#76ABAE]/10" />
-                    <div className="sv-blob absolute bottom-[5%] right-[-8%] h-112 w-md bg-[#5C6676]/15" />
-                </div>
-
-                <div className="mx-auto max-w-7xl">
-                    <div className="mb-16 max-w-3xl">
-                        <Reveal from="left">
-                            <span className="inline-flex items-center rounded-full border border-[#76ABAE]/30 bg-[#76ABAE]/10 px-5 py-2 text-sm font-semibold text-[#B9D6D8]">
-                                Our services
-                            </span>
-                        </Reveal>
-
-                        <h2 className="sv-display mt-6 text-4xl font-extrabold leading-[1.05] text-[#EEEEEE] sm:text-5xl md:text-6xl">
-                            <WordsOnView text="Everything you need to grow online" />
-                        </h2>
-
-                        <Reveal delay={250}>
-                            <p className="mt-6 max-w-xl text-lg leading-8 text-[#B3B8BD]">
-                                End-to-end digital solutions designed to help your business
-                                thrive at every stage.
-                            </p>
-                        </Reveal>
-                    </div>
-
-                    <div
-    ref={carouselRef}
-    className="flex items-stretch gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-hide"
->
-    {services.map((service, i) => (
-        <div
-            key={service.title}
-            className="flex w-[85%] flex-none snap-start sm:w-[48%] lg:w-[31%]"
-        >
-            <div className="h-full w-full">
-                <ServiceCard service={service} index={i} />
-            </div>
-        </div>
-    ))}
-</div>
-                </div>
-            </section>
-
-            {/* ============================ CTA ============================= */}
-
-            <section className="sv-cta relative isolate mx-4 my-16 overflow-hidden rounded-3xl border border-[#76ABAE]/40 bg-[#20272F] px-5 py-20 text-center shadow-[0_0_40px_rgba(118,171,174,0.08)] sm:mx-8 sm:px-8 sm:py-28 lg:mx-auto lg:max-w-7xl">
-
-                {/* Background decorations */}
-                <div
-                    className="pointer-events-none absolute inset-0 -z-10"
-                    aria-hidden="true"
-                >
-                    <div className="sv-cta-ring" />
-                    <div className="sv-blob sv-blob-a absolute -top-20 left-[10%] h-72 w-72 rounded-full bg-[#76ABAE]/10 blur-3xl" />
-                    <div className="sv-blob sv-blob-b absolute -bottom-24 right-[8%] h-80 w-80 rounded-full bg-[#5C6676]/15 blur-3xl" />
-                </div>
-
-                {/* Subtle top border accent */}
-                <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#76ABAE]/80 to-transparent" />
-
-                <div className="mx-auto flex max-w-4xl flex-col items-center">
-
-                    <Reveal from="scale">
-                        <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-[#76ABAE]/30 bg-[#76ABAE]/10 px-5 py-2 text-sm font-semibold tracking-wide text-[#B9D6D8]">
-                            <span className="sv-live-dot" />
-                            Let&apos;s talk
-                        </div>
-                    </Reveal>
-
-                    <h2 className="sv-display text-4xl font-extrabold leading-[1.1] tracking-tight text-[#EEEEEE] sm:text-5xl md:text-7xl">
-                        <WordsOnView text="Ready to build your" />
-                        <br className="hidden sm:block" />
-                        <WordsOnView
-                            text="digital empire?"
-                            wordClassName="sv-grad-text"
-                        />
-                    </h2>
-
-                    <Reveal delay={300}>
-                        <p className="mt-7 max-w-2xl text-base leading-8 text-[#EEEEEE]/70 sm:text-lg">
-                            Contact our team today and let&apos;s turn your ideas into digital
-                            reality.
-                        </p>
-                    </Reveal>
-
-                    <Reveal delay={450} className="w-full sm:w-auto">
-                        <div className="mt-10 flex w-full flex-col items-center justify-center gap-4 sm:w-auto sm:flex-row">
-
-                            <Magnetic
-                                href="/contact/"
-                                className="sv-btn-primary w-full sm:w-auto"
-                            >
-                                <span className="relative z-10">Start a project</span>
-                                <ArrowIcon className="relative z-10 h-5 w-5" />
-                            </Magnetic>
-
-                            <Magnetic
-                                href="tel:+0000000000"
-                                className="sv-btn-ghost w-full sm:w-auto"
-                            >
-                                Call us now
-                            </Magnetic>
-
-                        </div>
-                    </Reveal>
-                </div>
-            </section>
-        </main>
+        return () => cleanups.forEach((fn) => fn());
+      }
     );
+
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) ScrollTrigger.refresh();
+    });
+
+    return () => {
+      cancelled = true;
+      mm.revert();
+    };
+  }, [curve, services]);
+
+  return (
+    <section
+      ref={rootRef}
+      id="services"
+      data-hot="false"
+      className="relative overflow-x-clip bg-[color:var(--fw-sbg,#ffffff)] px-4 py-[clamp(4rem,9vw,8rem)] text-[color:var(--fw-sfg,#0a0a0a)] transition-colors duration-700 ease-out motion-reduce:transition-none sm:px-6 lg:px-10"
+    >
+      <header className={`mx-auto mb-[clamp(2rem,5vw,4.5rem)] flex flex-col gap-4 md:flex-row md:items-end md:justify-between ${WIDTH}`}>
+        <h2 className="text-[clamp(2.25rem,1rem+4.5vw,5rem)] font-semibold leading-[0.95] tracking-tight">{PAGE_TITLE}</h2>
+        <p className="max-w-sm text-[0.95rem] leading-relaxed opacity-65 md:text-base">
+          {PAGE_INTRO}
+        </p>
+      </header>
+
+      <ul className={`mx-auto grid grid-cols-1 items-start gap-x-[clamp(1.25rem,2.5vw,2.5rem)] gap-y-[clamp(1.5rem,5vw,4.5rem)] lg:grid-cols-2 lg:[&>li:nth-child(even)]:mt-[clamp(2.5rem,7vw,7rem)] ${WIDTH}`}>
+        {services.map((service, i) => (
+          <ServiceCard key={service.slug} service={service} index={i} />
+        ))}
+      </ul>
+
+      <div className={`mx-auto mt-[clamp(2.5rem,6vw,5rem)] ${WIDTH}`}>
+        <Link
+          href={ctaHref}
+          className="group inline-flex min-h-12 items-center gap-3 rounded-full bg-current px-6 py-3 text-base font-medium outline-none transition-opacity duration-300 hover:opacity-85 focus-visible:ring-2 focus-visible:ring-current focus-visible:ring-offset-4"
+        >
+          <span className="inline-flex items-center gap-3 text-[color:var(--fw-sbg,#ffffff)]">
+            <span aria-hidden="true" className="size-2 rounded-full bg-current" />
+            <span>{ctaLabel}</span>
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              className="transition-transform duration-300 group-hover:translate-x-1 motion-reduce:transition-none"
+            >
+              <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M2.343 8h11.314m0 0L8.673 3.016M13.657 8l-4.984 4.984" />
+            </svg>
+          </span>
+        </Link>
+      </div>
+
+      {/* "View" cursor bubble (mouse devices only, positioned by GSAP) */}
+      <div
+        ref={cursorRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed left-0 top-0 z-50 flex size-[84px] items-center justify-center rounded-full text-sm font-medium opacity-0 invisible"
+      >
+        View
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================== */
+/*  7. PAGE (default export) – Lenis + section + styles                */
+/* ================================================================== */
+const CSS = `
+@keyframes fw-drift-a { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(4%,-5%,0) scale(1.06); } }
+@keyframes fw-drift-b { 0%,100% { transform: translate3d(0,0,0) rotate(0deg); } 50% { transform: translate3d(-5%,4%,0) rotate(8deg); } }
+.fw-drift-a { animation: fw-drift-a 14s ease-in-out infinite; }
+.fw-drift-b { animation: fw-drift-b 18s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .fw-drift-a, .fw-drift-b { animation: none; } }
+`;
+
+export default function Page() {
+  // Single global Lenis instance driven by GSAP's ticker.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const lenis = new Lenis({ autoRaf: false, anchors: true });
+    lenis.on("scroll", ScrollTrigger.update);
+    const tick = (time: number) => lenis.raf(time * 1000);
+    gsap.ticker.add(tick);
+    gsap.ticker.lagSmoothing(0);
+
+    return () => {
+      gsap.ticker.remove(tick);
+      gsap.ticker.lagSmoothing(500, 33);
+      lenis.destroy();
+    };
+  }, []);
+
+  return (
+    <main>
+      <style>{CSS}</style>
+      <ServicesSection />
+    </main>
+  );
 }

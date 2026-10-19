@@ -2,30 +2,41 @@
 /**
  * Navbar.tsx – Empire AE
  * Next.js 16 (App Router) · React 19 · Tailwind CSS v3.4+ / v4. No extra dependencies.
- * Matches the Services page: same palette, easing, radii, rolling titles and active-dot pattern.
+ * Matches the Services page: same palette, easing, radii, rolling titles.
+ *
+ * LAYOUT
+ *  - Desktop (lg and up): Services, Our Team, Works, About, Careers, Contact sit in the bar,
+ *    and Services opens the card panel.
+ *  - Phones and tablets (below lg): the links are replaced by a menu icon. Tapping it opens a list
+ *    of all headings. "Services" expands to show every service; the other rows are plain links.
+ *  - Search: the search button opens a panel that searches services and pages.
+ *    Shortcut: Ctrl/Cmd + K. Arrow keys move through results, Enter opens one, Esc closes.
  *
  * LOGO
- *  - Put your logo file in  public/logo.svg  (SVG is best; a transparent PNG also works).
- *  - Change the file name, alt text or colour mode in the LOGO object in section 3 below.
+ *  - Put your logo file in  public/  and change the LOGO object in section 3.
  *
  * WHATSAPP
  *  - The phone icon in the header opens a WhatsApp chat.
  *  - Change the number and the pre-filled message in the WHATSAPP object in section 1 below.
  *    Number = country code + number, digits only (no "+", spaces or dashes). Example: 919999999999
  *
+ * SEARCH
+ *  - Add or edit searchable pages in the PAGES list in section 1. Services are searched
+ *    automatically from SERVICES (title, tags and description).
+ *
  * COLOUR FOLLOWING
  *  - The header reads the real background + text colour of whatever sits behind it and copies them
- *    into --nav-bg / --nav-fg. Logo, links, icons, hamburger and the Services dropdown all use
- *    those two variables, so when the Services section changes colour on card hover, the whole
- *    navbar follows it frame by frame.
+ *    into --nav-bg / --nav-fg. Logo, links, icons, the Services panel and the search panel all use
+ *    those two variables.
  *  - Optional overrides: data-nav-theme="dark" | "light" on a section (use it on image/video heroes),
  *    and data-nav-skip on an element (e.g. each service <li>) so it is ignored when it scrolls
  *    under the header and the section colour behind it is used instead.
  *
  * Ideal: move SERVICES to a shared file (e.g. data/services.ts) and import it here and on the page.
  */
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 
 /* ================================================================== */
 /*  1. DATA  (same palette as the Services page)                       */
@@ -51,6 +62,21 @@ const LINKS = [
   { label: "Contact", href: "/contact" },
 ];
 
+/** Pages that the search panel can find (services are added automatically). */
+const PAGES = [
+  { title: "All services", sub: "Everything we offer", href: "/services" },
+  { title: "Our Team", sub: "The people behind our work", href: "/team" },
+  { title: "Works", sub: "Selected projects and case studies", href: "/works" },
+  { title: "About", sub: "Who we are and how we work", href: "/about" },
+  { title: "Careers", sub: "Open roles at Empire AE", href: "/careers" },
+  { title: "Contact", sub: "Start a project or ask a question", href: "/contact" },
+  { title: "Our Impact", sub: "The numbers behind our projects", href: "/impact" },
+  { title: "Testimonials", sub: "What clients say about us", href: "/testimonials" },
+  { title: "Clients", sub: "Brands we work with", href: "/clients" },
+  { title: "Partnership", sub: "Technology and strategic alliances", href: "/partnership" },
+  { title: "Insights", sub: "Ideas and research on design and technology", href: "/insights" },
+];
+
 /**
  * WHATSAPP – the phone icon in the header opens this chat.
  *  number:  country code + number, digits only (no "+", spaces or dashes)
@@ -59,19 +85,29 @@ const LINKS = [
 const WHATSAPP = { number: "919999999999", message: "Hi Empire AE, I'd like to discuss a project." };
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP.number}?text=${encodeURIComponent(WHATSAPP.message)}`;
 
-type MenuItem = { key: string; text: string; cta: string; href: string; bg: string; fg: string; accent: string; stats?: [string, string][] };
-const MENU: MenuItem[] = [
-  {
-    key: "Impact", cta: "Our Impact", href: "/impact", bg: "#1a1411", fg: "#ffedd7", accent: "#e8a15a",
-    text: "Every innovation that happens here is out of a quest to get better at what we are already doing. We deliver ideas that make a difference and build ecosystems that foster progress.",
-    stats: [["700+", "Projects launched successfully across the globe"], ["10M", "Daily customer engagement through our projects"], ["100+", "Digital transformation stories that made a difference"]],
-  },
-  { key: "Testimonials", cta: "Read testimonials", href: "/testimonials", bg: "#E3E3F8", fg: "#000000", accent: "#7b7be8", text: "Hear from the teams we've built with, in their own words." },
-  { key: "Clients", cta: "Meet our clients", href: "/clients", bg: "#121414", fg: "#ffffff", accent: "#3dd6c6", text: "From ambitious start-ups to established enterprises, the brands that trust us with their next chapter." },
-  { key: "Partnership", cta: "Partner with us", href: "/partnership", bg: "#EFD5D3", fg: "#000000", accent: "#d8554f", text: "Technology and strategic alliances that let us deliver more, together." },
-  { key: "Insights", cta: "Read insights", href: "/insights", bg: "#111a13", fg: "#d9f3de", accent: "#5fbf7a", text: "Ideas, research and perspectives on design, technology and growth." },
-  { key: "Contact", cta: "Start a conversation", href: "/contact", bg: "#BFE3FA", fg: "#0a2540", accent: "#6cb8ee", text: "Have a project in mind? Tell us what you're building and we'll get back within one working day." },
+/* ---- search index ---- */
+type Hit = { title: string; sub: string; kind: "Service" | "Page"; href: string; hay: string };
+const INDEX: Hit[] = [
+  ...SERVICES.map<Hit>((s) => ({ title: s.title, sub: s.tags.join(" • "), kind: "Service", href: s.href, hay: `${s.title} ${s.tags.join(" ")} ${s.description}`.toLowerCase() })),
+  ...PAGES.map<Hit>((p) => ({ title: p.title, sub: p.sub, kind: "Page", href: p.href, hay: `${p.title} ${p.sub}`.toLowerCase() })),
 ];
+const SUGGESTED = ["Web Design", "Web Development", "Mobile App Development", "SEO", "Works", "Contact"]
+  .map((t) => INDEX.find((h) => h.title === t))
+  .filter((h): h is Hit => Boolean(h));
+
+function runSearch(q: string): Hit[] {
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return SUGGESTED;
+  return INDEX.map((h) => {
+    if (!terms.every((t) => h.hay.includes(t))) return { h, score: 0 };
+    const title = h.title.toLowerCase();
+    return { h, score: terms.reduce((n, t) => n + (title.startsWith(t) ? 3 : title.includes(t) ? 2 : 1), 0) };
+  })
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map((r) => r.h);
+}
 
 /* ================================================================== */
 /*  2. COLOUR DETECTION                                                */
@@ -103,7 +139,7 @@ function detectTone(header: HTMLElement | null): Tone | null {
   header.style.pointerEvents = "none";
   const hit = document.elementFromPoint(window.innerWidth / 2, 42);
   header.style.pointerEvents = prev;
-  if (!hit || hit.closest("[data-nav-ignore]")) return null; // dropdown / menu open: keep current colours
+  if (!hit || hit.closest("[data-nav-ignore]")) return null; // dropdown / search open: keep current colours
 
   const tagged = hit.closest<HTMLElement>("[data-nav-theme]");
   if (tagged) return tagged.dataset.navTheme === "light" ? LIGHT : DARK;
@@ -142,6 +178,7 @@ function detectTone(header: HTMLElement | null): Tone | null {
 const EASE = "ease-[cubic-bezier(0.22,1,0.36,1)]";
 const INK = "text-[color:var(--nav-fg)]";
 const SOFT = "text-[color:color-mix(in_srgb,var(--nav-fg)_62%,transparent)] hover:text-[color:var(--nav-fg)]";
+const ON = "!text-[color:var(--nav-fg)]";
 
 /**
  * LOGO – edit these three values to change the logo.
@@ -155,7 +192,7 @@ const LOGO = { src: "images/logo.png", alt: "Empire AE", recolor: true };
 
 function Logo() {
   // Height of the logo. The width follows automatically from the logo's shape.
-const size = "h-15 w-auto sm:h-16 lg:h-17";
+  const size = "h-15 w-auto sm:h-16 lg:h-17";
   if (!LOGO.recolor) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={LOGO.src} alt={LOGO.alt} className={`block ${size}`} />;
@@ -192,10 +229,9 @@ const Icon = ({ d, className = "size-5", sw = 1.8 }: { d: string; className?: st
   </svg>
 );
 
-/** Letter-by-letter roll, same effect as the Services cards. */
+/** Letter-by-letter roll on hover, same effect as the Services cards. */
 const ROLL_HOVER = "group-hover:-translate-y-1/2 group-focus-visible:-translate-y-1/2";
-const ROLL_ACTIVE = "group-data-[active=true]:-translate-y-1/2";
-function RollingTitle({ text, on }: { text: string; on: "hover" | "active" }) {
+function RollingTitle({ text }: { text: string }) {
   const words = text.split(" ");
   let index = 0;
   return (
@@ -210,7 +246,7 @@ function RollingTitle({ text, on }: { text: string; on: "hover" | "active" }) {
                 return (
                   <span key={c} className="inline-block h-[1.25em] overflow-hidden leading-[1.25em]">
                     <span
-                      className={`block transition-transform duration-500 ${EASE} ${on === "hover" ? ROLL_HOVER : ROLL_ACTIVE} motion-reduce:transition-none`}
+                      className={`block transition-transform duration-500 ${EASE} ${ROLL_HOVER} motion-reduce:transition-none`}
                       style={{ transitionDelay: `${i * 18}ms` }}
                     >
                       <span className="block">{ch}</span>
@@ -239,51 +275,48 @@ function Art({ s }: { s: Service }) {
   );
 }
 
-function CountUp({ value, run }: { value: string; run: boolean }) {
-  const [text, setText] = useState(value);
-  useEffect(() => {
-    if (!run) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setText(value);
-    const num = parseFloat(value);
-    const suffix = value.replace(/[\d.]/g, "");
-    let raf = 0;
-    const start = performance.now();
-    const tick = (now: number) => {
-      const p = Math.min((now - start) / 1200, 1);
-      setText(Math.round(num * (1 - Math.pow(1 - p, 3))) + suffix);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [run, value]);
-  return <>{text}</>;
-}
-
 const Arrow = ({ className = "size-4" }: { className?: string }) => (
   <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className={className}>
     <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M2.343 8h11.314m0 0L8.673 3.016M13.657 8l-4.984 4.984" />
   </svg>
 );
 
+/** Runs `fn` only for a real mouse (so touch taps don't trigger hover behaviour). */
+const mouseOnly = (fn: () => void) => (e: PointerEvent) => {
+  if (e.pointerType === "mouse") fn();
+};
+
 /* ================================================================== */
 /*  4. NAVBAR                                                          */
 /* ================================================================== */
 export default function Navbar() {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [megaOpen, setMegaOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  const [mobSvc, setMobSvc] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sel, setSel] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const headerRef = useRef<HTMLElement>(null);
-  const closeBtn = useRef<HTMLButtonElement>(null);
-  const burger = useRef<HTMLButtonElement>(null);
   const servicesBtn = useRef<HTMLButtonElement>(null);
+  const burger = useRef<HTMLButtonElement>(null);
+  const searchBtn = useRef<HTMLButtonElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const later = (fn: () => void, ms: number) => {
     clearTimeout(timer.current);
     timer.current = setTimeout(fn, ms);
   };
   const keepOpen = () => clearTimeout(timer.current);
+
+  const results = useMemo(() => runSearch(query), [query]);
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   /* ---- sticky header: follow the colour behind it, live ---- */
   useEffect(() => {
@@ -338,15 +371,89 @@ export default function Navbar() {
     };
   }, []);
 
-  /* ---- esc, scroll lock, focus ---- */
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
-    burger.current?.focus();
+  /* ---- open / close helpers ---- */
+  const closeSearch = useCallback((refocus = false) => {
+    setSearchOpen(false);
+    setQuery("");
+    setSel(0);
+    if (refocus) searchBtn.current?.focus();
   }, []);
+
+  const closeMenu = useCallback((refocus = false) => {
+    setMenuOpen(false);
+    setMobSvc(false);
+    if (refocus) burger.current?.focus();
+  }, []);
+
+  const closeAll = useCallback(() => {
+    setMegaOpen(false);
+    closeSearch();
+    closeMenu();
+  }, [closeSearch, closeMenu]);
+
+  const toggleMega = () => {
+    closeSearch();
+    setMegaOpen((o) => !o);
+  };
+  const openMega = () => {
+    closeSearch();
+    setMegaOpen(true);
+  };
+  const toggleMenu = () => {
+    setMegaOpen(false);
+    closeSearch();
+    if (menuOpen) closeMenu();
+    else setMenuOpen(true);
+  };
+  const toggleSearch = () => {
+    setMegaOpen(false);
+    closeMenu();
+    if (searchOpen) closeSearch();
+    else setSearchOpen(true);
+  };
+
+  // Close everything after navigating to another page
+  useEffect(() => {
+    closeAll();
+  }, [pathname, closeAll]);
+
+  // Close the mobile menu if the window grows into the desktop layout
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const on = () => {
+      if (mq.matches) closeMenu();
+    };
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [closeMenu]);
+
+  // Focus the search box when it opens
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = setTimeout(() => inputRef.current?.focus(), 60);
+    return () => clearTimeout(id);
+  }, [searchOpen]);
+
+  // Esc closes; Ctrl/Cmd + K toggles search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setMegaOpen(false);
+        setMenuOpen(false);
+        setMobSvc(false);
+        setSearchOpen((o) => {
+          if (o) {
+            setQuery("");
+            setSel(0);
+          }
+          return !o;
+        });
+        return;
+      }
       if (e.key !== "Escape") return;
-      if (menuOpen) closeMenu();
+      if (menuOpen) closeMenu(true);
+      else if (searchOpen) closeSearch(true);
       else if (megaOpen) {
         setMegaOpen(false);
         servicesBtn.current?.focus();
@@ -354,19 +461,25 @@ export default function Navbar() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen, megaOpen, closeMenu]);
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? "hidden" : "";
-    if (!menuOpen) return;
-    const id = setTimeout(() => closeBtn.current?.focus(), 350);
-    return () => clearTimeout(id);
-  }, [menuOpen]);
+  }, [menuOpen, searchOpen, megaOpen, closeMenu, closeSearch]);
 
-  const openMenu = () => {
-    setMegaOpen(false);
-    setActive(0);
-    setMenuOpen(true);
+  /* ---- search interactions ---- */
+  const go = (h: Hit | undefined) => {
+    if (!h) return;
+    router.push(h.href);
+    closeSearch();
   };
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSel((s) => (results.length ? (s + 1) % results.length : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSel((s) => (results.length ? (s - 1 + results.length) % results.length : 0));
+    }
+  };
+
+  /* ---- services slider arrows ---- */
   const track = useRef<HTMLUListElement>(null);
   const [edge, setEdge] = useState({ prev: false, next: true });
   const updateArrows = useCallback(() => {
@@ -379,10 +492,20 @@ export default function Navbar() {
     if (megaOpen) updateArrows();
   }, [megaOpen, updateArrows]);
 
-  const cur = MENU[active];
-
-  const navLink = `flex items-center gap-1.5 rounded-full px-4 py-2.5 text-base font-medium tracking-tight transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-current ${SOFT}`;
+  const linkBase = `flex items-center gap-1.5 whitespace-nowrap rounded-full font-medium tracking-tight transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-current ${SOFT}`;
+  const navLink = `${linkBase} px-4 py-2.5 text-base`;
+  const navLinkMobile = `${linkBase} shrink-0 px-3.5 py-2 text-[0.95rem]`;
+  const mobRow = "flex w-full min-h-12 items-center justify-between gap-3 rounded-[0.9rem] px-3 py-3 text-left text-[1.15rem] font-medium tracking-tight outline-none transition-colors duration-200 hover:bg-[color-mix(in_srgb,currentColor_8%,transparent)] focus-visible:bg-[color-mix(in_srgb,currentColor_10%,transparent)]";
+  const mobSub = "flex min-h-11 items-center gap-3 rounded-[0.8rem] py-2.5 pl-6 pr-3 text-base tracking-tight opacity-80 outline-none transition-[background-color,opacity] duration-200 hover:bg-[color-mix(in_srgb,currentColor_8%,transparent)] hover:opacity-100 focus-visible:bg-[color-mix(in_srgb,currentColor_10%,transparent)] focus-visible:opacity-100";
   const iconBtn = `grid size-11 place-items-center rounded-full transition-colors duration-300 hover:bg-[color-mix(in_srgb,currentColor_12%,transparent)] ${INK}`;
+
+  const panel = [
+    "mx-auto overflow-y-auto rounded-[1.4rem] border p-2.5 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.45)]",
+    "border-[color-mix(in_srgb,var(--nav-fg)_14%,transparent)] bg-[var(--nav-bg)] text-[color:var(--nav-fg)]",
+    `transition-[clip-path,opacity,transform,background-color,color] duration-[550ms] ${EASE}`,
+  ].join(" ");
+  const panelOpen = "translate-y-0 opacity-100 [clip-path:inset(0_0_0_0_round_1.4rem)]";
+  const panelShut = "-translate-y-2 opacity-0 [clip-path:inset(0_0_100%_0_round_1.4rem)]";
 
   return (
     <>
@@ -392,28 +515,29 @@ export default function Navbar() {
         className={[
           "fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top)] [--nav-bg:#ffffff] [--nav-fg:#0a0a0a]",
           "transition-[background-color,border-color] duration-300 ease-out",
-          scrolled
+          scrolled || megaOpen || searchOpen || menuOpen
             ? "border-b border-[color-mix(in_srgb,var(--nav-fg)_12%,transparent)] bg-[color-mix(in_srgb,var(--nav-bg)_78%,transparent)] backdrop-blur-xl"
             : "border-b border-transparent",
         ].join(" ")}
       >
         <div className={`mx-auto flex h-[72px] max-w-[1440px] items-center gap-8 px-5 transition-colors duration-200 sm:px-8 lg:h-[84px] lg:px-14 ${INK}`}>
-          {/* Logo (replaces the old "empire" text) */}
+          {/* Logo */}
           <Link href="/" aria-label="Empire AE home" className={`flex items-center ${INK}`}>
             <Logo />
           </Link>
 
+          {/* Desktop navigation */}
           <nav aria-label="Primary" className="mx-auto hidden lg:block">
-            <ul className="flex items-center gap-0.5" onMouseLeave={() => later(() => setMegaOpen(false), 160)} onMouseEnter={keepOpen}>
+            <ul className="flex items-center gap-0.5" onPointerLeave={mouseOnly(() => later(() => setMegaOpen(false), 160))} onPointerEnter={mouseOnly(keepOpen)}>
               <li>
                 <button
                   ref={servicesBtn}
                   type="button"
                   aria-expanded={megaOpen}
                   aria-controls="services-mega"
-                  onClick={() => setMegaOpen((o) => !o)}
-                  onMouseEnter={() => later(() => setMegaOpen(true), 90)}
-                  className={`${navLink} ${megaOpen ? "!text-[color:var(--nav-fg)]" : ""}`}
+                  onClick={toggleMega}
+                  onPointerEnter={mouseOnly(() => later(openMega, 90))}
+                  className={`${navLink} ${megaOpen || isActive("/services") ? ON : ""}`}
                 >
                   Services
                   <Icon d="m6 9 6 6 6-6" className={`size-3.5 transition-transform duration-500 ${megaOpen ? "rotate-180" : ""}`} sw={2} />
@@ -421,7 +545,12 @@ export default function Navbar() {
               </li>
               {LINKS.map((l) => (
                 <li key={l.href}>
-                  <Link href={l.href} className={navLink} onMouseEnter={() => later(() => setMegaOpen(false), 120)}>
+                  <Link
+                    href={l.href}
+                    aria-current={isActive(l.href) ? "page" : undefined}
+                    className={`${navLink} ${isActive(l.href) ? ON : ""}`}
+                    onPointerEnter={mouseOnly(() => later(() => setMegaOpen(false), 120))}
+                  >
                     {l.label}
                   </Link>
                 </li>
@@ -431,35 +560,94 @@ export default function Navbar() {
 
           <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
             {/* Phone icon -> opens a WhatsApp chat in a new tab (number + message set in WHATSAPP above) */}
-            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className={`${iconBtn} hidden xl:grid`}>
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className={iconBtn}>
               <Icon d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" className="size-[22px]" sw={1.6} />
             </a>
-            <button type="button" aria-label="Search" className={iconBtn}>
-              <Icon d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4" className="size-[22px]" />
+            <button
+              ref={searchBtn}
+              type="button"
+              onClick={toggleSearch}
+              aria-label={searchOpen ? "Close search" : "Search"}
+              aria-expanded={searchOpen}
+              aria-controls="site-search"
+              className={iconBtn}
+            >
+              <Icon d={searchOpen ? "M5 5l14 14M19 5 5 19" : "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4"} className="size-[22px]" />
             </button>
 
-            <button ref={burger} type="button" onClick={openMenu} aria-label="Open menu" aria-haspopup="dialog" className={`group ml-1.5 grid size-12 place-content-center rounded-full ${INK}`}>
-              <span className="block h-0.5 w-[30px] rounded bg-current" />
-              <span className="ml-auto mt-[7px] block h-0.5 w-[22px] rounded bg-current transition-all duration-500 group-hover:w-[30px]" />
+            {/* Menu icon: phones and tablets only */}
+            <button
+              ref={burger}
+              type="button"
+              onClick={toggleMenu}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              className={`${iconBtn} lg:hidden`}
+            >
+              <span aria-hidden="true" className="relative block h-4 w-[22px]">
+                <span className={`absolute left-0 top-0 h-0.5 w-full rounded bg-current transition-transform duration-500 ${EASE} ${menuOpen ? "translate-y-[7px] rotate-45" : ""}`} />
+                <span className={`absolute left-0 top-[7px] h-0.5 w-full rounded bg-current transition-opacity duration-300 ${menuOpen ? "opacity-0" : ""}`} />
+                <span className={`absolute left-0 top-[14px] h-0.5 w-full rounded bg-current transition-transform duration-500 ${EASE} ${menuOpen ? "-translate-y-[7px] -rotate-45" : ""}`} />
+              </span>
             </button>
           </div>
+        </div>
+
+        {/* ============ Mobile menu (below lg): every heading in a list ============ */}
+        <div id="mobile-menu" className={`absolute inset-x-0 top-full block px-3 sm:px-8 lg:hidden ${menuOpen ? "visible" : "pointer-events-none invisible"}`}>
+          <nav aria-label="Mobile" className={[panel, "max-h-[calc(100dvh-100px)] max-w-[560px] sm:ml-auto sm:mr-0", menuOpen ? panelOpen : panelShut].join(" ")}>
+            <ul data-lenis-prevent>
+              <li>
+                <button
+                  type="button"
+                  aria-expanded={mobSvc}
+                  aria-controls="mobile-services"
+                  onClick={() => setMobSvc((o) => !o)}
+                  className={`${mobRow} ${mobSvc || isActive("/services") ? "" : "opacity-90"}`}
+                >
+                  Services
+                  <Icon d="m6 9 6 6 6-6" className={`size-4 transition-transform duration-500 ${mobSvc ? "rotate-180" : ""}`} sw={2} />
+                </button>
+                <div id="mobile-services" className={`grid transition-[grid-template-rows] duration-500 ${EASE} ${mobSvc ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                  <ul className="min-h-0 overflow-hidden" inert={!mobSvc}>
+                    {SERVICES.map((s) => (
+                      <li key={s.slug}>
+                        <Link href={s.href} onClick={closeAll} className={mobSub}>
+                          <span aria-hidden="true" className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.accent }} />
+                          {s.title}
+                        </Link>
+                      </li>
+                    ))}
+                    <li>
+                      <Link href="/services" onClick={closeAll} className={`${mobSub} font-medium`}>
+                        View all services
+                        <Arrow className="size-3.5" />
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              </li>
+              {LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link href={l.href} onClick={closeAll} aria-current={isActive(l.href) ? "page" : undefined} className={`${mobRow} ${isActive(l.href) ? "bg-[color-mix(in_srgb,currentColor_8%,transparent)]" : "opacity-90"}`}>
+                    {l.label}
+                    <Arrow className="size-4 opacity-60" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
         </div>
 
         {/* ============ Services dropdown (follows screen colour; cards take their service colour on hover) ============ */}
         <div
           id="services-mega"
-          onMouseEnter={keepOpen}
-          onMouseLeave={() => later(() => setMegaOpen(false), 160)}
+          onPointerEnter={mouseOnly(keepOpen)}
+          onPointerLeave={mouseOnly(() => later(() => setMegaOpen(false), 160))}
           className={`absolute inset-x-0 top-full hidden px-5 sm:px-8 lg:block lg:px-14 ${megaOpen ? "visible" : "pointer-events-none invisible"}`}
         >
-          <div
-            className={[
-              "mx-auto max-h-[calc(100vh-110px)] max-w-[1328px] overflow-y-auto rounded-[1.4rem] border p-2.5 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.45)]",
-              "border-[color-mix(in_srgb,var(--nav-fg)_14%,transparent)] bg-[var(--nav-bg)] text-[color:var(--nav-fg)]",
-              `transition-[clip-path,opacity,transform,background-color,color] duration-[550ms] ${EASE}`,
-              megaOpen ? "translate-y-0 opacity-100 [clip-path:inset(0_0_0_0_round_1.4rem)]" : "-translate-y-2 opacity-0 [clip-path:inset(0_0_100%_0_round_1.4rem)]",
-            ].join(" ")}
-          >
+          <div className={[panel, "max-h-[calc(100dvh-140px)] max-w-[1328px]", megaOpen ? panelOpen : panelShut].join(" ")}>
             <ul ref={track} data-lenis-prevent onScroll={updateArrows} className="-my-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-0.5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&:has(a:hover)_a:not(:hover)]:opacity-50">
               {SERVICES.map((s, i) => (
                 <li
@@ -480,7 +668,7 @@ export default function Navbar() {
                       <div className="relative mt-1 text-[1.05rem] font-medium leading-tight tracking-tight">
                         <span aria-hidden="true" className={`absolute left-0 top-[0.6em] size-[0.5em] -translate-x-3 -translate-y-1/2 rounded-full bg-current opacity-0 transition-[transform,opacity] duration-500 ${EASE} group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100`} />
                         <div className={`w-[calc(100%-0.85em)] transition-transform duration-500 ${EASE} group-hover:translate-x-[0.85em] group-focus-visible:translate-x-[0.85em]`}>
-                          <RollingTitle text={s.title} on="hover" />
+                          <RollingTitle text={s.title} />
                         </div>
                       </div>
                       <p className="mt-1.5 line-clamp-2 text-[0.78rem] leading-relaxed opacity-70">{s.description}</p>
@@ -504,131 +692,90 @@ export default function Navbar() {
             </div>
           </div>
         </div>
+
+        {/* ============ Search panel ============ */}
+        <div id="site-search" className={`absolute inset-x-0 top-full block px-3 sm:px-8 lg:px-14 ${searchOpen ? "visible" : "pointer-events-none invisible"}`}>
+          <div role="dialog" aria-label="Search" className={[panel, "max-h-[calc(100dvh-140px)] max-w-[760px]", searchOpen ? panelOpen : panelShut].join(" ")}>
+            <form
+              role="search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                go(results[sel]);
+              }}
+              className="flex items-center gap-3 rounded-[1.1rem] bg-[color-mix(in_srgb,currentColor_7%,transparent)] pl-4 pr-2 focus-within:ring-2 focus-within:ring-[color-mix(in_srgb,currentColor_35%,transparent)]"
+            >
+              <Icon d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4" className="size-5 shrink-0 opacity-70" />
+              <input
+                ref={inputRef}
+                type="search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSel(0);
+                }}
+                onKeyDown={onSearchKey}
+                placeholder="Search services and pages"
+                aria-label="Search services and pages"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                className="h-14 w-full bg-transparent text-base outline-none placeholder:text-current placeholder:opacity-50 [&::-webkit-search-cancel-button]:hidden"
+              />
+              {query && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setQuery("");
+                    setSel(0);
+                    inputRef.current?.focus();
+                  }}
+                  className="grid size-10 shrink-0 place-items-center rounded-full transition-colors duration-300 hover:bg-[color-mix(in_srgb,currentColor_12%,transparent)]"
+                >
+                  <Icon d="M5 5l14 14M19 5 5 19" className="size-[18px]" />
+                </button>
+              )}
+            </form>
+
+            <div className="px-1 pb-1 pt-3" aria-live="polite">
+              {results.length > 0 ? (
+                <>
+                  {!query.trim() && <p className="px-3 pb-2 text-sm opacity-60">Suggested</p>}
+                  <ul>
+                    {results.map((h, i) => (
+                      <li key={h.href + h.title}>
+                        <Link
+                          href={h.href}
+                          onClick={() => closeSearch()}
+                          onPointerEnter={mouseOnly(() => setSel(i))}
+                          aria-current={sel === i}
+                          className={`flex items-center justify-between gap-4 rounded-[0.9rem] px-3 py-2.5 outline-none transition-colors duration-200 focus-visible:bg-[color-mix(in_srgb,currentColor_10%,transparent)] ${sel === i ? "bg-[color-mix(in_srgb,currentColor_10%,transparent)]" : ""}`}
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-[1.02rem] font-medium tracking-tight">{h.title}</span>
+                            <span className="block truncate text-[0.8rem] opacity-65">{h.sub}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2 text-[0.8rem] opacity-65">
+                            {h.kind}
+                            <Arrow className="size-3.5" />
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="px-3 py-4 text-[0.95rem] opacity-75">
+                  No results for “{query.trim()}”. Try a service such as web design, app development or SEO.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       </header>
 
-      {/* click-away scrim */}
-      <div data-nav-ignore onClick={() => setMegaOpen(false)} className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${megaOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
-
-      {/* ============ Right-side half-page menu (palette changes per item, like the Services section) ============ */}
-      {/* dim + blur backdrop, click to close */}
-      <div
-        data-nav-ignore
-        onClick={closeMenu}
-        aria-hidden="true"
-        className={`fixed inset-0 z-[99] bg-black/45 backdrop-blur-[3px] transition-opacity duration-500 ${menuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      />
-
-      {/* panel: full width on phones, 75% small tablets, 60% tablets, half the screen on desktop */}
-      <aside
-        data-nav-ignore
-        data-lenis-prevent
-        role="dialog"
-        aria-modal="true"
-        aria-label="Site menu"
-        style={{ "--m-bg": cur.bg, "--m-fg": cur.fg } as CSSProperties}
-        className={[
-          "fixed inset-y-0 right-0 z-[100] flex w-full max-w-[960px] flex-col overflow-hidden bg-[var(--m-bg)] text-[color:var(--m-fg)] shadow-[-40px_0_90px_-30px_rgba(0,0,0,0.5)] sm:w-[75vw] md:w-[60vw] lg:w-1/2 sm:rounded-l-[1.4rem]",
-          menuOpen
-            ? "visible translate-x-0 [transition:transform_700ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s]"
-            : "invisible translate-x-full [transition:transform_600ms_cubic-bezier(.22,1,.36,1),background-color_700ms_ease-out,color_700ms_ease-out,visibility_0s_linear_600ms]",
-        ].join(" ")}
-      >
-        {/* soft shade that cross-fades with each item */}
-        {MENU.map((m, i) => (
-          <div
-            key={m.key}
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-0 transition-opacity duration-1000 ${active === i ? "opacity-100" : "opacity-0"}`}
-            style={{ background: `radial-gradient(120% 70% at 90% 100%, color-mix(in srgb, ${m.accent} 28%, transparent), transparent 62%)` }}
-          />
-        ))}
-
-        {/* top row */}
-        <div className="relative z-10 shrink-0 pt-[env(safe-area-inset-top)]">
-          <div className="flex h-[72px] items-center justify-between px-6 sm:px-10 lg:h-[84px]">
-            {/* Logo in the menu: takes the menu's text colour, which changes per item */}
-            <Link href="/" onClick={closeMenu} aria-label="Empire AE home" className="flex items-center">
-              <Logo />
-            </Link>
-            <button
-              ref={closeBtn}
-              type="button"
-              onClick={closeMenu}
-              aria-label="Close menu"
-              className="grid size-12 place-items-center rounded-full bg-[color-mix(in_srgb,currentColor_14%,transparent)] outline-none transition-[transform,background-color] duration-500 hover:rotate-90 hover:bg-[color-mix(in_srgb,currentColor_24%,transparent)] focus-visible:ring-2 focus-visible:ring-current"
-            >
-              <Icon d="M5 5l14 14M19 5 5 19" className="size-[22px]" />
-            </button>
-          </div>
-        </div>
-
-        {/* link list – fixed in place, never scrolls away */}
-        <ul className="relative z-10 flex shrink-0 flex-col gap-px px-6 pt-2 sm:px-10">
-          {MENU.map((m, i) => (
-            <li
-              key={m.key}
-              className={`transition-[opacity,transform] duration-700 ${EASE} ${menuOpen ? "translate-x-0 opacity-100" : "translate-x-8 opacity-0"}`}
-              style={{ transitionDelay: menuOpen ? `${250 + i * 60}ms` : "0ms" }}
-            >
-              <button
-                type="button"
-                aria-current={active === i}
-                onClick={() => setActive(i)}
-                onFocus={() => setActive(i)}
-                onPointerEnter={(e) => e.pointerType === "mouse" && setActive(i)}
-                className={`block w-full py-1 text-left text-[clamp(1.15rem,0.9rem+0.8vw,1.55rem)] font-medium leading-[1.2] tracking-tight outline-none transition-opacity duration-500 ${active === i ? "opacity-100" : "opacity-40 hover:opacity-70"}`}
-              >
-                {m.key}
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {/* details for the selected item – own scroll area, shown in full */}
-        <div data-lenis-prevent className="relative mt-5 min-h-0 flex-1 overflow-y-auto border-t border-[color-mix(in_srgb,currentColor_16%,transparent)] px-6 pb-10 pt-6 sm:px-10">
-          <div className="grid">
-            {MENU.map((m, i) => (
-              <section key={m.key} aria-hidden={active !== i} className={`col-start-1 row-start-1 transition-[opacity,transform] duration-[600ms] ${EASE} ${active === i ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"}`}>
-                <h2 className="mb-3 text-[clamp(1.5rem,1rem+1.4vw,2.2rem)] font-semibold leading-tight tracking-tight">{m.key === "Impact" ? "Our Impact" : m.key}</h2>
-                <p className="mb-6 max-w-[46ch] text-[clamp(0.95rem,0.88rem+0.3vw,1.1rem)] leading-relaxed opacity-75">{m.text}</p>
-                {m.stats && (
-                  <div className="mb-6 grid grid-cols-3 gap-4 sm:gap-6">
-                    {m.stats.map(([n, label]) => (
-                      <div key={n}>
-                        <b className="mb-2 block text-[clamp(1.5rem,1rem+1.5vw,2.25rem)] font-light leading-none tracking-tight">
-                          <CountUp value={n} run={menuOpen && active === i} />
-                        </b>
-                        <span className="block text-[0.8rem] leading-snug opacity-70 sm:text-sm">{label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Link
-                  href={m.href}
-                  onClick={closeMenu}
-                  tabIndex={active === i ? 0 : -1}
-                  className="group inline-flex min-h-11 items-center gap-3 rounded-full bg-[var(--m-fg)] px-5 py-2.5 text-[0.95rem] font-medium outline-none transition-opacity duration-300 hover:opacity-85 focus-visible:ring-2 focus-visible:ring-[var(--m-fg)] focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--m-bg)]"
-                >
-                  <span className="inline-flex items-center gap-3 text-[color:var(--m-bg)]">
-                    <span aria-hidden="true" className="size-2 rounded-full bg-current" />
-                    {m.cta}
-                    <Arrow className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
-                  </span>
-                </Link>
-              </section>
-            ))}
-          </div>
-
-          {/* primary pages, for screens where the top links are hidden */}
-          <div className="mt-8 flex flex-wrap gap-2 lg:hidden">
-            {[{ label: "Services", href: "/services" }, ...LINKS].map((l) => (
-              <Link key={l.href} href={l.href} onClick={closeMenu} className="rounded-full border border-[color-mix(in_srgb,currentColor_28%,transparent)] px-4 py-2 text-sm font-medium">
-                {l.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </aside>
+      {/* click-away scrim (closes the Services, search and mobile menu panels) */}
+      <div data-nav-ignore onClick={closeAll} aria-hidden="true" className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ${megaOpen || searchOpen || menuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
     </>
   );
 }
